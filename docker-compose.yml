@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: calendar_app_service
+    command: npm run dev
+    volumes:
+      - ./src:/usr/src/app/src
+    ports:
+      - '${PORT:-3000}:${PORT:-3000}'
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  db:
+    image: mysql:8.0
+    container_name: calendar_db_container
+    env_file:
+      - ./.env # 컨테이너 내부로 전달
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_USER_PASSWORD}
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./src/models/schema/calendar_db.sql:/docker-entrypoint-initdb.d/calendar_db.sql:ro
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+
+    container_name: calendar_redis_container
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    restart: always
+
+volumes:
+  db_data:
+  redis_data:

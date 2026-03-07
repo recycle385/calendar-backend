@@ -1,0 +1,1 @@
+export const CALENDAR_GRACE_PERIOD = 30;
