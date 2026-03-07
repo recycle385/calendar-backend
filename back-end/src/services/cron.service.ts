@@ -27,12 +27,20 @@ export class CronService {
 
       logger.info(`[Cron] 보관 기간이 지난 ${expiredCalendars.length}개의 캘린더를 삭제`);
 
+      const expiredCalendarIds = expiredCalendars.map((calendar) => calendar.id);
+
+      const deletedCalendars = await this.calendarRepository.deleteByIds(expiredCalendarIds);
+
+      if (expiredCalendars.length !== deletedCalendars) {
+        logger.warn(
+          `[Cron] 캘린더 삭제 개수 불일치. (대상: ${expiredCalendars.length}개, 실제 삭제: ${deletedCalendars}개)`
+        );
+      }
+
       const io = getIO();
 
       for (const calendar of expiredCalendars) {
         try {
-          await this.calendarRepository.delete(calendar.id);
-
           io.to(calendar.slug).emit('calendarDeleted', {
             message: '보관 기간(30일)이 만료되어 캘린더가 영구 삭제되었습니다.',
           });
@@ -56,12 +64,20 @@ export class CronService {
 
       logger.info(`[Cron] 투표 기간이 끝난 ${targetCalendars.length}개의 캘린더를 마감`);
 
+      const targetCalendarIds = targetCalendars.map((calendar) => calendar.id);
+
+      const closedCalendarsCount = await this.calendarRepository.closeByIds(targetCalendarIds);
+
+      if (targetCalendars.length !== closedCalendarsCount) {
+        logger.warn(
+          `[Cron] 캘린더 마감 개수 불일치. (대상: ${targetCalendars.length}개, 실제 마감: ${closedCalendarsCount}개)`
+        );
+      }
+
       const io = getIO();
 
       for (const calendar of targetCalendars) {
         try {
-          await this.calendarRepository.close(calendar.id);
-
           io.to(calendar.slug).emit('calendarClosed', {
             message: '투표 기간이 종료되어 자동 마감되었습니다.',
             isClosed: true,

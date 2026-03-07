@@ -6,7 +6,7 @@ import winston from 'winston';
 
 import { env } from '../config/env';
 
-// ✅ 로그 디렉토리 자동 생성
+// 로그 디렉토리 자동 생성
 const logDir = path.join(process.cwd(), 'logs');
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
@@ -14,9 +14,9 @@ if (!fs.existsSync(logDir)) {
 
 // Winston 로거 설정
 export const logger = winston.createLogger({
-  level: env.NODE_ENV === 'production' ? 'info' : 'debug', // ✅ env 사용
+  level: env.NODE_ENV === 'production' ? 'info' : 'debug', // env 사용
   format: winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), // ✅ 포맷 지정
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), // 포맷 지정
     winston.format.errors({ stack: true }),
     winston.format.json()
   ),
@@ -24,8 +24,8 @@ export const logger = winston.createLogger({
     new winston.transports.File({
       filename: path.join(logDir, 'error.log'),
       level: 'error',
-      maxsize: 5242880, // ✅ 5MB 제한
-      maxFiles: 5, // ✅ 최대 5개 파일 보관
+      maxsize: 5242880, // 5MB 제한
+      maxFiles: 5, // 최대 5개 파일 보관
     }),
     new winston.transports.File({
       filename: path.join(logDir, 'combined.log'),
@@ -33,7 +33,7 @@ export const logger = winston.createLogger({
       maxFiles: 5,
     }),
   ],
-  // ✅ 예외 처리
+  // 예외 처리
   exceptionHandlers: [
     new winston.transports.File({ filename: path.join(logDir, 'exceptions.log') }),
   ],
@@ -51,7 +51,7 @@ if (env.NODE_ENV !== 'production') {
   );
 }
 
-// ✅ 민감 정보 필터링 함수
+// 민감 정보 필터링 함수
 const sanitizeData = (data: any): any => {
   if (!data || typeof data !== 'object') return data;
 
@@ -69,11 +69,11 @@ const sanitizeData = (data: any): any => {
   return sanitized;
 };
 
-// ✅ 단일 로깅 미들웨어 (중복 제거)
+// 단일 로깅 미들웨어 (중복 제거)
 export const requestLogger = (req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
 
-  // ✅ 응답 완료 시 로깅
+  // 응답 완료 시 로깅
   res.on('finish', () => {
     const duration = Date.now() - start;
     const logData = {
@@ -83,14 +83,14 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
       duration: `${duration}ms`,
       userAgent: req.headers['user-agent'],
       ip: req.ip || req.socket.remoteAddress,
-      // ✅ 민감 정보 필터링 후 로깅 (선택적)
+      // 민감 정보 필터링 후 로깅 (선택적)
       ...(env.NODE_ENV !== 'production' && {
         body: sanitizeData(req.body),
         query: sanitizeData(req.query),
       }),
     };
 
-    // ✅ 상태 코드에 따라 로그 레벨 조정
+    // 상태 코드에 따라 로그 레벨 조정
     if (res.statusCode >= 500) {
       logger.error(logData);
     } else if (res.statusCode >= 400) {
@@ -103,11 +103,11 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
   next();
 };
 
-// ✅ Morgan은 간단한 액세스 로그용으로만 사용 (선택사항)
+// Morgan은 간단한 액세스 로그용으로만 사용 (선택사항)
 export const morganLogger = morgan(
   ':method :url :status :res[content-length] - :response-time ms',
   {
-    skip: (req, res) => env.NODE_ENV === 'test', // ✅ 테스트 환경에서는 스킵
+    skip: (req, res) => env.NODE_ENV === 'test', // 테스트 환경에서는 스킵
     stream: {
       write: (message: string) => logger.http(message.trim()),
     },

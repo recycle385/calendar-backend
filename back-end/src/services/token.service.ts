@@ -31,12 +31,17 @@ export class TokenService implements ITokenService {
     return jwt.generateSignupToken(payload, expiresIn);
   }
 
-  // accesstoken (메인토큰) --------------------------------
+  // 메인토큰 --------------------------------
+
+  public generateMainToken(payload: MainTokenPayload, expiresIn?: string): string {
+    return jwt.generateMainToken(payload, expiresIn);
+  }
 
   public verifyMainToken(token: string): MainTokenPayload {
     return jwt.verifyMainToken(token);
   }
 
+  // TODO: 안씀 지울 예정
   public verifyUserToken(token: string): UserTokenPayload {
     return jwt.verifyUserToken(token);
   }
@@ -134,7 +139,7 @@ export class TokenService implements ITokenService {
       return false;
     }
 
-    // 이미 블랙리스트에 등록된 토큰은 verifyRefreshToken에서 처리됨
+    // 이미 블랙리스트에 등록된 토큰은 verifyRefreshToken에서 처리
     await this.redisBlacklist.addToBlacklist(tokenId, expiresIn, now.toString()).catch((err) => {
       logger.error('리프레쉬 토큰 블랙리스트 추가 중 오류 발생:', err);
       return false;

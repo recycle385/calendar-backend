@@ -1,4 +1,3 @@
-// src/utils/errors/enums.ts
 export enum HttpStatus {
   OK = 200,
   CREATED = 201,
@@ -16,5 +15,5 @@ export enum ErrorCode {
   AUTH_REQUIRED = 'AUTH_REQUIRED',
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   FORBIDDEN = 'FORBIDDEN',
-  // 필요에 따라 추가
+  EXTERNAL_API_ERROR = 'EXTERNAL_API_ERROR',
 }

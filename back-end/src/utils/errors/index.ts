@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 import { AppError } from './AppError';
 import { ErrorCode, HttpStatus } from './enums';
 
@@ -41,6 +43,23 @@ export const Errors = {
       errorCode: ErrorCode.INVALID_INPUT,
       details,
     }),
+
+  ExternalApiError: (err: unknown, defaultMessage: string) => {
+    if (axios.isAxiosError(err)) {
+      return new AppError(
+        err.response?.data?.error_description || err.response?.data?.message || defaultMessage,
+        err.response?.status || HttpStatus.INTERNAL,
+        {
+          errorCode: ErrorCode.EXTERNAL_API_ERROR,
+          details: err.response?.data,
+        }
+      );
+    }
+
+    return new AppError(err instanceof Error ? err.message : defaultMessage, HttpStatus.INTERNAL, {
+      errorCode: ErrorCode.EXTERNAL_API_ERROR,
+    });
+  },
 };
 
 export { AppError } from './AppError';

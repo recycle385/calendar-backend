@@ -14,12 +14,13 @@ import routes from './routes';
 
 const app = express();
 
+app.set('trust proxy', 1);
 app.use(helmet());
 app.use(corsMiddleware);
 registerMiddlewares(app);
 
 app.use(requestLogger);
-app.use('/api/', rateLimiter);
+app.use(API_PREFIX, rateLimiter);
 
 app.use(API_PREFIX, routes);
 

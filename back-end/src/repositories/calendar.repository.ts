@@ -3,6 +3,7 @@ import { PoolConnection } from 'mysql2/promise';
 
 import dbpool from '../config/database';
 import { Calendar, CreateCalendarInput, UpdateCalendarInput } from '../models/Calendar';
+import { CalendarWithHostUuid } from '../models/Calendar';
 import { Errors } from '../utils/errors';
 
 export interface ICalendarRepository {
@@ -13,7 +14,13 @@ export interface ICalendarRepository {
   getIdUsingSlug(slug: string, connection?: PoolConnection): Promise<number>;
   update(id: number, input: UpdateCalendarInput, connection?: PoolConnection): Promise<boolean>;
   delete(id: number, connection?: PoolConnection): Promise<boolean>;
+  deleteByIds(ids: number[], connection?: PoolConnection): Promise<number>;
   close(id: number, connection?: PoolConnection): Promise<boolean>;
+  closeByIds(ids: number[], connection?: PoolConnection): Promise<number>;
+  getCalAndPUuidDatasByUserIds(
+    user_id: number,
+    connection?: PoolConnection
+  ): Promise<CalendarWithHostUuid[]>;
   slugExists(slug: string, connection?: PoolConnection): Promise<boolean>;
   findEndedAndOpen(connection?: PoolConnection): Promise<Calendar[]>;
   findExpired(connection?: PoolConnection): Promise<Calendar[]>;
@@ -180,6 +187,17 @@ export class CalendarRepository implements ICalendarRepository {
     return result.affectedRows > 0;
   }
 
+  async deleteByIds(ids: number[], connection?: PoolConnection): Promise<number> {
+    const poolToUse = connection || this.pool;
+
+    const [result] = await poolToUse.query<ResultSetHeader>(
+      'DELETE FROM calendars WHERE id IN (?)',
+      [ids]
+    );
+
+    return result.affectedRows;
+  }
+
   /**
    * 캘린더 마감 (투표 종료)
    */
@@ -192,6 +210,17 @@ export class CalendarRepository implements ICalendarRepository {
     );
 
     return result.affectedRows > 0;
+  }
+
+  async closeByIds(ids: number[], connection?: PoolConnection): Promise<number> {
+    const poolToUse = connection || this.pool;
+
+    const [result] = await poolToUse.query<ResultSetHeader>(
+      'UPDATE calendars SET is_closed = TRUE WHERE id IN (?)',
+      [ids]
+    );
+
+    return result.affectedRows;
   }
 
   /**
@@ -222,10 +251,31 @@ export class CalendarRepository implements ICalendarRepository {
     const poolToUse = connection || this.pool;
 
     const [rows] = await poolToUse.execute<RowDataPacket[]>(
-      'SELECT * FROM calendars WHERE expired_at < NOW()'
+      'SELECT id FROM calendars WHERE expired_at < NOW()'
     );
 
     return rows.map((row) => this.mapToCalendar(row));
+  }
+
+  async getCalAndPUuidDatasByUserIds(
+    user_id: number,
+    connection?: PoolConnection
+  ): Promise<CalendarWithHostUuid[]> {
+    const poolToUse = connection || this.pool;
+
+    const [rows] = await poolToUse.query<RowDataPacket[]>(
+      ` SELECT c.*, p.participant_uuid AS hostParticipantUuid 
+        FROM calendars AS c 
+        JOIN participants AS p ON c.id = p.calendar_id 
+        WHERE p.role = 'host' AND p.user_id = ?`,
+      [user_id]
+    );
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    return rows.map((row) => this.mapToCalWithPUuid(row));
   }
 
   /**
@@ -243,6 +293,13 @@ export class CalendarRepository implements ICalendarRepository {
       owner_id: row.owner_id,
       created_at: new Date(row.created_at),
       expired_at: new Date(row.expired_at),
+    };
+  }
+
+  private mapToCalWithPUuid(row: RowDataPacket): CalendarWithHostUuid {
+    return {
+      ...this.mapToCalendar(row),
+      hostParticipantUuid: row.hostParticipantUuid,
     };
   }
 }

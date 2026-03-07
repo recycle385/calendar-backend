@@ -9,7 +9,13 @@ export interface IDateOptionRepository {
   create(input: CreateDateOptionInput, connection?: PoolConnection): Promise<DateOption>;
   createBatch(calendarId: number, dates: string[], connection?: PoolConnection): Promise<number>;
   findById(id: number, connection?: PoolConnection): Promise<DateOption | null>;
+  findOptionsByIds(ids: number[], connection?: PoolConnection): Promise<DateOption[]>;
   findByCalendarId(calendarId: number, connection?: PoolConnection): Promise<DateOption[]>;
+  findDateOptionsByCalendarAndDate(
+    calendarId: number,
+    dateValue: string[],
+    connection?: PoolConnection
+  ): Promise<DateOption[]>;
   findByCalendarAndDate(
     calendarId: number,
     dateValue: string,
@@ -33,7 +39,7 @@ export class DateOptionRepository implements IDateOptionRepository {
       [calendar_id, date_value, is_enabled ?? true]
     );
 
-    const dateOption = await this.findById(result.insertId);
+    const dateOption = await this.findById(result.insertId, connection);
     if (!dateOption) {
       throw Errors.Internal('날짜 옵션 생성 후 조회 실패');
     }
@@ -79,6 +85,26 @@ export class DateOptionRepository implements IDateOptionRepository {
     return this.mapToDateOption(rows[0]);
   }
 
+  async findOptionsByIds(ids: number[], connection?: PoolConnection): Promise<DateOption[]> {
+    const poolToUse = connection || this.pool;
+
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const [rows] = await poolToUse.query<RowDataPacket[]>(
+      'SELECT * FROM date_options WHERE id in (?)',
+      [ids]
+    );
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const result = rows.map((s) => this.mapToDateOption(s));
+    return result;
+  }
+
   async findByCalendarId(calendarId: number, connection?: PoolConnection): Promise<DateOption[]> {
     const poolToUse = connection || this.pool;
 
@@ -88,6 +114,26 @@ export class DateOptionRepository implements IDateOptionRepository {
     );
 
     return rows.map((row) => this.mapToDateOption(row));
+  }
+
+  async findDateOptionsByCalendarAndDate(
+    calendarId: number,
+    dateValue: string[],
+    connection?: PoolConnection
+  ): Promise<DateOption[]> {
+    const poolToUse = connection || this.pool;
+
+    if (dateValue.length === 0) {
+      return [];
+    }
+
+    const [rows] = await poolToUse.query<RowDataPacket[]>(
+      'SELECT * FROM date_options WHERE calendar_id = ? AND date_value IN (?)',
+      [calendarId, dateValue]
+    );
+
+    const result = rows.map((s) => this.mapToDateOption(s));
+    return result;
   }
 
   async findByCalendarAndDate(

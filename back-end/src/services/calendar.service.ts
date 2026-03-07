@@ -4,7 +4,12 @@ import { randomUUID } from 'crypto';
 import { env } from '../config/env';
 import { CALENDAR_GRACE_PERIOD } from '../constants/calendar.constants';
 import { TransactionManager } from '../infrastructure/transaction.manager';
-import { Calendar, CreateCalendarInput, UpdateCalendarInput } from '../models/Calendar';
+import {
+  Calendar,
+  CalendarWithHostUuid,
+  CreateCalendarInput,
+  UpdateCalendarInput,
+} from '../models/Calendar';
 import { ICalendarRepository } from '../repositories/calendar.repository';
 import { IDateOptionRepository } from '../repositories/dateOption.repository';
 import { IParticipantRepository } from '../repositories/participant.repository';
@@ -25,6 +30,7 @@ export interface ICalendarService {
   updateCalendar(slug: string, ownerId: number, input: UpdateCalendarInput): Promise<Calendar>;
   deleteCalendar(slug: string, ownerId: number): Promise<void>;
   closeCalendar(slug: string, ownerId: number): Promise<Calendar>;
+  getUserCalendarsWithPUuids(ownerId: number): Promise<CalendarWithHostUuid[]>;
 }
 
 export class CalendarService implements ICalendarService {
@@ -209,10 +215,14 @@ export class CalendarService implements ICalendarService {
   }
 
   /**
-   * 사용자의 캘린더 목록 조회
+   * TOdo: 사용자의 캘린더 목록 조회 => 참가자uuid포함해서 반환하는 메서드로 변경할것, 현재 메서드가 사용중인 부분 확인 후 삭제
    */
   async getUserCalendars(ownerId: number): Promise<Calendar[]> {
     return await this.calendarRepository.findByOwnerId(ownerId);
+  }
+
+  async getUserCalendarsWithPUuids(ownerId: number): Promise<CalendarWithHostUuid[]> {
+    return await this.calendarRepository.getCalAndPUuidDatasByUserIds(ownerId);
   }
 
   /**

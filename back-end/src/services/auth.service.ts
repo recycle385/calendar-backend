@@ -111,20 +111,14 @@ export class AuthService implements IAuthService {
         isTermsAgreed: isTermsAgreed,
       };
 
-      const affectedRows = await this.userRepository.createUser(newUserData, connection);
+      const createdNewUser = await this.userRepository.createUser(newUserData, connection);
 
-      if (affectedRows !== 1) {
-        throw Errors.Internal('유저 생성 실패');
-      }
-
-      const newUser = await this.userRepository.findUserInfoByUuid(
-        newUserData.user_uuid,
-        connection
-      );
       // 토큰 페어 생성
-      const tokenPair: TokenPair = await this.tokenService.generateTokenPair(newUser.user_uuid);
+      const tokenPair: TokenPair = await this.tokenService.generateTokenPair(
+        createdNewUser.user_uuid
+      );
 
-      return { tokenPair: tokenPair, user: newUser };
+      return { tokenPair: tokenPair, user: createdNewUser };
     });
   }
 
@@ -162,27 +156,35 @@ export class AuthService implements IAuthService {
 
   //구글 토큰 요청
   private async getGoogleTokens(code: string): Promise<GoogleTokens> {
-    const { data } = await axios.post('https://oauth2.googleapis.com/token', {
-      code,
-      client_id: env.GOOGLE_CLIENT_ID,
-      client_secret: env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: `${env.BACKEND_URL}/api/v1/auth/google/callback`,
-      grant_type: 'authorization_code',
-    });
-    return data;
+    try {
+      const { data } = await axios.post('https://oauth2.googleapis.com/token', {
+        code,
+        client_id: env.GOOGLE_CLIENT_ID,
+        client_secret: env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: `${env.CLIENT_URL}/auth/callback`,
+        grant_type: 'authorization_code',
+      });
+      return data;
+    } catch (err) {
+      throw Errors.ExternalApiError(err, '구글 인증 실패');
+    }
   }
 
   //구글 사용자 프로필 요청
   private async getGoogleUserProfile(accessToken: string): Promise<GoogleProfileOriginData> {
-    const { data } = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    try {
+      const { data } = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
 
-    return {
-      sub: data.id,
-      email: data.email,
-      name: data.name,
-      picture: data.picture,
-    };
+      return {
+        sub: data.id,
+        email: data.email,
+        name: data.name,
+        picture: data.picture,
+      };
+    } catch (err) {
+      throw Errors.ExternalApiError(err, '구글 프로필을 불러오는 중 오류');
+    }
   }
 }

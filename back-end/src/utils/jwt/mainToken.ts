@@ -60,7 +60,7 @@ export function verifyMainToken(token: string): MainTokenPayload {
   return toMainTokenPayload(decoded);
 }
 
-//위치 수정필요
+//TODO: 안씀, 제거예정
 export function verifyUserToken(token: string): UserTokenPayload {
   let decoded: unknown;
 

@@ -3,28 +3,31 @@ import Joi from 'joi';
 
 import { Errors } from '../utils/errors';
 
-// Body 검증
+const validationOptions = {
+  abortEarly: false,
+  stripUnknown: true,
+  allowUnknown: false,
+};
+
+const formatDateString = (value: string) => value.split('T')[0];
+
 export const validateBody = (schema: Joi.ObjectSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const { error, value } = schema.validate(req.body, {
-      abortEarly: false, // 모든 에러 수집
-      stripUnknown: true, // 정의되지 않은 필드 제거
-    });
+    const { error, value } = schema.validate(req.body, validationOptions);
 
     if (error) {
       const message = error.details.map((detail) => detail.message).join(', ');
       return next(Errors.ValidationError(message, error.details));
     }
 
-    req.body = value; // 검증된 값으로 교체
+    req.body = value;
     next();
   };
 };
 
-// Query 검증
 export const validateQuery = (schema: Joi.ObjectSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const { error, value } = schema.validate(req.query);
+    const { error, value } = schema.validate(req.query, validationOptions);
 
     if (error) {
       const message = error.details.map((detail) => detail.message).join(', ');
@@ -36,10 +39,9 @@ export const validateQuery = (schema: Joi.ObjectSchema) => {
   };
 };
 
-// Params 검증
 export const validateParams = (schema: Joi.ObjectSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const { error, value } = schema.validate(req.params);
+    const { error, value } = schema.validate(req.params, validationOptions);
 
     if (error) {
       const message = error.details.map((detail) => detail.message).join(', ');
@@ -51,22 +53,129 @@ export const validateParams = (schema: Joi.ObjectSchema) => {
   };
 };
 
-// 자주 사용하는 스키마 정의
-export const schemas = {
-  // UUID 검증
-  uuidParam: Joi.object({
-    id: Joi.string().uuid().required(),
-  }),
+export const participantUuidParams = Joi.object({
+  participantUuid: Joi.string()
+    .trim()
+    .uuid()
+    .required()
+    .messages({ 'any.required': '타켓 uuid가 필요합니다' }),
+});
 
-  // 페이지네이션
-  pagination: Joi.object({
-    page: Joi.number().integer().min(1).default(1),
-    limit: Joi.number().integer().min(1).max(100).default(20),
-  }),
+export const slugParams = Joi.object({
+  slug: Joi.string().trim().required().messages({ 'any.required': 'slug가 필요합니다' }),
+});
 
-  // 날짜 범위
+export const commonSchemas = {
+  slugAndParticipantUuidParams: slugParams.concat(participantUuidParams),
+
   dateRange: Joi.object({
-    startDate: Joi.date().iso().required(),
-    endDate: Joi.date().iso().min(Joi.ref('startDate')).required(),
+    start_date: Joi.string()
+      .trim()
+      .isoDate()
+      .required()
+      .custom(formatDateString, 'Format to YYYY-MM-DD'),
+    end_date: Joi.string()
+      .trim()
+      .isoDate()
+      .required()
+      .custom(endDateVerifier)
+      .custom(formatDateString, 'Format to YYYY-MM-DD'),
   }),
 };
+
+export const authSchemas = {
+  callbackQuery: Joi.object({
+    code: Joi.string()
+      .trim()
+      .required()
+      .messages({ 'any.required': '인증 정보가 만료되었거나 올바르지 않은 접근입니다.' }),
+  }),
+
+  signupRequest: Joi.object({
+    signupToken: Joi.string().trim().required(),
+    isTermsAgreed: Joi.boolean().invalid(false).required().messages({
+      'any.invalid': '이용약관에 동의해야 합니다',
+      'any.required': '약관 동의 여부는 필수입니다',
+    }),
+  }),
+};
+
+export const calendarSchemas = {
+  createRequest: Joi.object({
+    title: Joi.string().trim().min(1).max(100).required(),
+    description: Joi.string().trim().allow('', null).optional(),
+    hostNickname: Joi.string().trim().min(1).max(20).required(),
+  }).concat(commonSchemas.dateRange),
+
+  updateRequest: Joi.object({
+    title: Joi.string().trim().min(1).max(100).optional(),
+    description: Joi.string().trim().allow('', null).optional(),
+    start_date: Joi.string()
+      .trim()
+      .isoDate()
+      .optional()
+      .custom(formatDateString, 'Format to YYYY-MM-DD'),
+    end_date: Joi.string()
+      .trim()
+      .isoDate()
+      .optional()
+      .custom(endDateVerifier)
+      .custom(formatDateString, 'Format to YYYY-MM-DD'),
+  }),
+};
+
+export const participantSchemas = {
+  registerRequest: Joi.object({
+    nickname: Joi.string()
+      .trim()
+      .min(1)
+      .max(20)
+      .required()
+      .messages({ 'any.required': '닉네임은 필수입니다' }),
+    password: Joi.string().trim().min(4).max(50).optional(),
+  }),
+
+  loginRequest: Joi.object({
+    nickname: Joi.string().trim().optional(),
+    password: Joi.string().trim().optional(),
+  }),
+};
+
+export const voteSchemas = {
+  subVoteRequest: Joi.object({
+    selectedDates: Joi.array()
+      .items(
+        Joi.string().trim().isoDate().required().custom(formatDateString, 'Format to YYYY-MM-DD')
+      )
+      .min(1)
+      .unique()
+      .required()
+      .messages({
+        'any.required': '날짜를 선택해주세요',
+        'array.min': '날짜를 최소 1개 이상 선택해주세요',
+      }),
+    voteType: Joi.string().trim().valid('available', 'unavailable', 'maybe').required().messages({
+      'any.required': '투표 타입은 필수입니다',
+      'any.only': '유효하지 않은 투표 타입입니다 (available | unavailable | maybe)',
+    }),
+  }),
+};
+
+function endDateVerifier(value: string, helpers: Joi.CustomHelpers) {
+  const startDate = helpers.state.ancestors[0].start_date;
+  if (!startDate) return value;
+
+  const start = new Date(startDate);
+  const end = new Date(value);
+
+  if (start > end) {
+    return helpers.message({ custom: '종료일은 시작일보다 이전일 수 없습니다' } as any);
+  }
+
+  const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+  if (diffDays > 365) {
+    return helpers.message({ custom: '투표 기간은 최대 1년까지 가능합니다' } as any);
+  }
+
+  return value;
+}

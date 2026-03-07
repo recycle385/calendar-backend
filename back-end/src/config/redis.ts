@@ -1,12 +1,12 @@
 import { createClient, RedisClientType } from 'redis';
 
-import { logger } from '../middlewares/logger'; //  console 대신 logger 사용
+import { logger } from '../middlewares/logger';
 import { env } from './env';
 
 const REDIS_URL = env.REDIS_URL;
 
-let reconnectAttempts = 0; // 재연결 횟수 추적
-const MAX_RECONNECT_ATTEMPTS = 10; // 최대 재연결 제한
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 const reconnectStrategy = (retries: number) => {
   reconnectAttempts = retries;

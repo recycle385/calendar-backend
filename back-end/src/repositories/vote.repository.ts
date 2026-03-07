@@ -51,7 +51,11 @@ export class VoteRepository implements IVoteRepository {
       [participant_id, date_option_id, vote_type]
     );
 
-    const vote = await this.findByParticipantAndDateOption(participant_id, date_option_id);
+    const vote = await this.findByParticipantAndDateOption(
+      participant_id,
+      date_option_id,
+      connection
+    );
     if (!vote) {
       throw Errors.Internal('투표 생성 후 조회 실패');
     }
@@ -74,7 +78,7 @@ export class VoteRepository implements IVoteRepository {
     }
 
     // 참가자의 기존 투표 모두 삭제
-    await this.deleteAllByParticipant(participantId);
+    await this.deleteAllByParticipant(participantId, connection);
 
     // 새로운 투표 일괄 삽입
     const values = dateOptionIds.map((dateOptionId) => [participantId, dateOptionId, voteType]);
@@ -232,9 +236,6 @@ export class VoteRepository implements IVoteRepository {
     return Array.from(dateMap.values());
   }
 
-  /**
-   * DB row를 Vote 객체로 변환
-   */
   private mapToVote(row: RowDataPacket): Vote {
     return {
       id: row.id,

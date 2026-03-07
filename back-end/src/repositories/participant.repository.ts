@@ -84,7 +84,7 @@ export class ParticipantRepository implements IParticipantRepository {
       ]
     );
 
-    const participant = await this.findById(result.insertId);
+    const participant = await this.findById(result.insertId, connection);
     if (!participant) {
       throw Errors.Internal('참가자 생성 후 조회 실패');
     }
@@ -228,6 +228,7 @@ export class ParticipantRepository implements IParticipantRepository {
 
     return rows[0].participant_uuid;
   }
+
   /**
    * 캘린더의 모든 참가자 조회
    */

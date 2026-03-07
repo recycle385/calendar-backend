@@ -1,7 +1,7 @@
-import { NextFunction, Request, Response } from 'express';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
 
 import { env } from '../config/env';
-import { AppError } from '../utils/errors/AppError';
+import { AppError, Errors } from '../utils/errors';
 import { logger } from './logger';
 
 export const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
@@ -56,9 +56,21 @@ export const notFoundHandler = (req: Request, res: Response) => {
   });
 };
 
-// Async 에러 래퍼 (try-catch 생략용)
-export const asyncHandler = (fn: Function) => {
+export const asyncHandler = (fn: RequestHandler) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
+export const safeAsyncHandler = <T extends Request>(
+  guard: (req: Request) => req is T,
+  fn: (req: T, res: Response, next: NextFunction) => Promise<void>
+): RequestHandler => {
+  return (req, res, next) => {
+    if (guard(req)) {
+      Promise.resolve(fn(req, res, next)).catch(next);
+    } else {
+      next(Errors.Internal('인증 데이터 무결성 검증 실패 (내부 배달 사고)'));
+    }
   };
 };

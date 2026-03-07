@@ -24,6 +24,20 @@ export class UserRepository implements IUserRepository {
     return rows.length ? this.mapToUser(rows[0]) : null;
   }
 
+  async findUserInfoById(userId: number, connection?: PoolConnection): Promise<User> {
+    const poolToUse = connection || this.pool;
+
+    const [rows] = await poolToUse.execute<RowDataPacket[]>('SELECT * FROM users WHERE id = ?', [
+      userId,
+    ]);
+
+    if (rows.length === 0) {
+      throw Errors.NotFound('유저 조회 실패');
+    }
+
+    return this.mapToUser(rows[0]);
+  }
+
   async findUserInfoByUuid(userUuid: string, connection?: PoolConnection): Promise<User> {
     const poolToUse = connection || this.pool;
 
@@ -54,7 +68,7 @@ export class UserRepository implements IUserRepository {
     return rows[0].id;
   }
 
-  async createUser(userData: CreateUserInput, connection?: PoolConnection): Promise<number> {
+  async createUser(userData: CreateUserInput, connection?: PoolConnection): Promise<User> {
     const poolToUse = connection || this.pool;
 
     const {
@@ -71,7 +85,18 @@ export class UserRepository implements IUserRepository {
       'INSERT INTO users (user_uuid, email, oauth_provider, oauth_id, nickname, profile_image_url, isTermsAgreed) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [user_uuid, email, oauth_provider, oauth_id, nickname, profile_image_url, isTermsAgreed]
     );
-    return result.affectedRows;
+
+    if (result.affectedRows !== 1) {
+      throw Errors.Internal('유저 생성 실패');
+    }
+
+    const newUser = await this.findUserInfoById(result.insertId, connection);
+
+    if (!newUser) {
+      throw Errors.Internal('유저 생성 후 조회 실패');
+    }
+
+    return newUser;
   }
 
   private mapToUser(row: RowDataPacket): User {

@@ -10,9 +10,10 @@ export interface IUserRepository {
     oauthId: string,
     connection?: PoolConnection
   ): Promise<User | null>;
+  findUserInfoById(userId: number, connection?: PoolConnection): Promise<User>;
   findUserInfoByUuid(userUuid: string, connection?: PoolConnection): Promise<User>;
   getIdUsingUuid(userUuid: string, connection?: PoolConnection): Promise<number>;
-  createUser(userData: CreateUserInput, connection?: PoolConnection): Promise<number>;
+  createUser(userData: CreateUserInput, connection?: PoolConnection): Promise<User>;
 }
 
 export interface IAuthService {

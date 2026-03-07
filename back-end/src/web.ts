@@ -5,52 +5,52 @@ import { connectDatabaseWithRetry } from './config/database';
 import { env } from './config/env';
 import { connectRedis } from './config/redis';
 import { cronService } from './containers/cron.container';
+import { logger } from './middlewares/logger';
 import { initializeSocketIO } from './sockets';
 import { setupGracefulShutdown } from './utils/shutdownHandler';
 
-// 서버 시작
+process.on('uncaughtException', (err) => {
+  logger.error('UNCAUGHT EXCEPTION:', { err });
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('UNHANDLED REJECTION:', { reason });
+});
+
 async function startServer() {
   try {
-    console.log('서버 초기화');
+    logger.info('서버 초기화');
 
-    console.log('reids 연결 시도');
+    logger.info('reids 연결 시도');
     await connectRedis();
-    console.log('redis 연결 성공');
+    logger.info('redis 연결 성공');
 
-    console.log('db 연결 시도');
+    logger.info('db 연결 시도');
     await connectDatabaseWithRetry();
-    console.log('reids, db 연결성공');
+    logger.info('reids, db 연결성공');
 
     const server = http.createServer(app);
     initializeSocketIO(server);
 
     cronService.start();
-    console.log('[Cron] 서비스 시작 (매일 새벽 4시 실행)');
+    logger.info('[Cron] 서비스 시작 (매일 새벽 4시 실행)');
 
-    //서버 시작
     server.listen(env.PORT, () => {
-      console.log(`
+      logger.info(`
 ╔═══════════════════════════════╗
-║  🚀 서버가 실행 중 입니다!      ║
-║  📡 Port: ${env.PORT}         ║
-║  🌍 Env: ${env.NODE_ENV}      ║
-║  🔌 Redis: 연결됨              ║
-║  💾 Database: 연결됨           ║
+║  🚀 서버가 실행 중 입니다!    ║
+║  📡 Port: ${env.PORT}                ║
+║  🌍 Env: ${env.NODE_ENV}          ║
+║  🔌 Redis: 연결됨             ║
+║  💾 Database: 연결됨          ║
 ╚═══════════════════════════════╝
       `);
     });
 
-    process.on('uncaughtException', (err) => {
-      console.error('UNCAUGHT EXCEPTION:', err);
-    });
-
-    process.on('unhandledRejection', (reason) => {
-      console.error('UNHANDLED REJECTION:', reason);
-    });
-
     setupGracefulShutdown(server);
   } catch (error) {
-    console.error('서버 구동 실패:', error);
+    logger.error('서버 구동 실패:', { error });
     process.exit(1);
   }
 }

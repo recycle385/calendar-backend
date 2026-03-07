@@ -13,7 +13,6 @@ import { IRedisBlacklistRepository } from '../types/token.types';
 import { IUserRepository } from '../types/user.types';
 const db = pool;
 
-// 모든 Repository를 여기서 초기화
 export const calendarRepository: ICalendarRepository = new CalendarRepository(db);
 export const dateOptionRepository: IDateOptionRepository = new DateOptionRepository(db);
 export const participantRepository: IParticipantRepository = new ParticipantRepository(db);

@@ -52,3 +52,7 @@ export const VOTE_ROUTES = {
 
   CHECK_VOTE: '/:participantUuid',
 };
+
+export const SWAGGER_ROUTES = {
+  BASE: '/api-docs',
+};

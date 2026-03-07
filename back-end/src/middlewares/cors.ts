@@ -3,12 +3,7 @@ import cors from 'cors';
 import { env } from '../config/env';
 import { Errors } from '../utils/errors';
 
-// 허용할 출처(도메인) 목록
-// 실제 배포 시에는 프론트엔드의 실제 도메인을 추가해야 합니다.
-const allowedOrigins = [
-  env.CLIENT_URL, // 개발용 프론트엔드 주소
-  'https://your-production-site.com', // 배포된 프론트엔드 주소
-];
+const allowedOrigins = [env.CLIENT_URL, 'https://your-production-site.com'];
 
 const corsOptions: cors.CorsOptions = {
   /**

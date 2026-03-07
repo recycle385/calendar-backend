@@ -14,4 +14,4 @@ export const REFRESH_TOKEN_EXPIRES_IN = '7d';
 export const REFRESH_TOKEN_PREFIX = 'refresh_token:';
 
 // 블랙리스트 적용 유예 기간 (밀리초)
-export const GRACE_PERIOD = 10000;
+export const GRACE_PERIOD = 10;

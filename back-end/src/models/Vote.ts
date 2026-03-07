@@ -49,3 +49,9 @@ export interface DateVoteStatus {
     vote_type: VoteType;
   }[];
 }
+
+export interface VoteRecordForParticipant
+  extends Omit<Vote, 'id' | 'participant_id' | 'date_option_id' | 'updated_at'> {
+  vote_id: number;
+  date_value: Date | string;
+}

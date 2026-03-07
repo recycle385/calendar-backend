@@ -34,22 +34,17 @@ export async function connectDatabaseWithRetry(retries = 5, initialDelayMs = 200
         err
       );
 
-      // 마지막 재시도도 실패한 경우
       if (i === retries - 1) {
         console.error('최대 재시도 횟수를 초과했습니다. 프로세스를 종료합니다.');
         process.exit(1);
       }
 
-      // 지수 백오프
       await new Promise((res) => setTimeout(res, delay));
       delay *= 2;
     }
   }
 }
 
-/**
- * 서버 종료 시 DB 커넥션 풀 정리
- */
 export async function closeDatabaseConnection() {
   try {
     await pool.end();

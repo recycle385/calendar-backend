@@ -25,8 +25,8 @@ export function isGoogleProfileData(obj: unknown): obj is GoogleProfileData {
   if (typeof obj !== 'object' || obj === null) return false;
 
   return (
-    'oauthId' in obj &&
-    typeof obj.oauthId === 'string' &&
+    'oauth_id' in obj &&
+    typeof obj.oauth_id === 'string' &&
     'email' in obj &&
     typeof obj.email === 'string' &&
     'name' in obj &&
@@ -59,16 +59,16 @@ export const extractProperty = {
   nullableString(
     decoded: Record<string, unknown>,
     key: string,
-    propertyName: string
+    fieldName: string
   ): string | undefined {
-    const value = this.get(decoded, key);
-
-    if (value === undefined || value === null) {
+    // key가 없거나 undefined/null이면 undefined 반환
+    if (!(key in decoded) || decoded[key] === undefined || decoded[key] === null) {
       return undefined;
     }
 
+    const value = decoded[key];
     if (typeof value !== 'string') {
-      throw Errors.Unauthorized(`${propertyName}(${key})의 형식이 잘못됐습니다`);
+      throw Errors.Unauthorized(`${fieldName}(${key})의 타입이 올바르지 않습니다`);
     }
     return value;
   },

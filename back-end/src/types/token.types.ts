@@ -1,4 +1,4 @@
-import { GoogleProfileData } from '../types/auth.types';
+import { GoogleProfileData } from './auth.types';
 
 export interface MainTokenPayload {
   sub: string; // user_uuid
@@ -49,6 +49,7 @@ export interface IRedisBlacklistRepository {
 
 export interface ITokenService {
   verifySignupToken(token: string): SignupTokenPayload;
+  generateMainToken(payload: MainTokenPayload, expiresIn?: string): string;
   verifyMainToken(token: string): MainTokenPayload;
   verifyUserToken(token: string): UserTokenPayload;
 
