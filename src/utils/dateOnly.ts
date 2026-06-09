@@ -1,17 +1,83 @@
 export type DateOnlyString = string;
 export type DateOnlyInput = string | Date;
 
-export function parseDateOnlyToUtcDate(value: DateOnlyInput): Date {
-  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const COMPACT_DATE_ONLY_PATTERN = /^(\d{4})(\d{2})(\d{2})$/;
 
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`유효하지 않은 날짜입니다: ${value}`);
+function assertValidDateParts(year: number, month: number, day: number, originalValue: unknown) {
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() + 1 !== month ||
+    date.getUTCDate() !== day
+  ) {
+    throw new Error(`유효하지 않은 날짜입니다: ${originalValue}`);
+  }
+}
+
+export function normalizeDateOnly(value: unknown): DateOnlyString {
+  if (typeof value !== 'string') {
+    throw new Error('날짜는 YYYY-MM-DD 문자열이어야 합니다');
   }
 
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const trimmed = value.trim();
+  const match = DATE_ONLY_PATTERN.exec(trimmed);
+
+  if (!match) {
+    throw new Error('날짜는 YYYY-MM-DD 형식이어야 합니다');
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  assertValidDateParts(year, month, day, value);
+
+  return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+export function normalizeCompactDateOnly(value: unknown): DateOnlyString {
+  if (typeof value !== 'string') {
+    throw new Error('날짜는 YYYYMMDD 문자열이어야 합니다');
+  }
+
+  const trimmed = value.trim();
+  const match = COMPACT_DATE_ONLY_PATTERN.exec(trimmed);
+
+  if (!match) {
+    throw new Error('날짜는 YYYYMMDD 형식이어야 합니다');
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  assertValidDateParts(year, month, day, value);
+
+  return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+export function parseDateOnlyToUtcDate(value: DateOnlyInput): Date {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      throw new Error(`유효하지 않은 날짜입니다: ${value}`);
+    }
+
+    return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  }
+
+  const normalized = normalizeDateOnly(value);
+  const [year, month, day] = normalized.split('-').map(Number);
+
+  return new Date(Date.UTC(year, month - 1, day));
 }
 
 export function formatDateOnly(value: DateOnlyInput): DateOnlyString {
+  if (typeof value === 'string') {
+    return normalizeDateOnly(value);
+  }
+
   const date = parseDateOnlyToUtcDate(value);
 
   const year = date.getUTCFullYear();
@@ -45,10 +111,7 @@ export function todayDateOnlyUtc(now: Date = new Date()): DateOnlyString {
   return formatDateOnly(now);
 }
 
-export function eachDateOnlyInRange(
-  start: DateOnlyInput,
-  end: DateOnlyInput
-): DateOnlyString[] {
+export function eachDateOnlyInRange(start: DateOnlyInput, end: DateOnlyInput): DateOnlyString[] {
   const result: DateOnlyString[] = [];
   let current = formatDateOnly(start);
   const normalizedEnd = formatDateOnly(end);

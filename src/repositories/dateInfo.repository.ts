@@ -126,12 +126,7 @@ export class DateInfoRepository implements IDateInfoRepository {
 
     const [result] = await poolToUse.query<ResultSetHeader>(
       `DELETE FROM date_info WHERE (location_date, date_name) IN (?)`,
-      [
-        dateNamePairs.map(({ locationDate, dateName }) => [
-          formatDateOnly(locationDate),
-          dateName,
-        ]),
-      ]
+      [dateNamePairs.map(({ locationDate, dateName }) => [formatDateOnly(locationDate), dateName])]
     );
 
     return result.affectedRows;
@@ -207,12 +202,7 @@ export class DateInfoRepository implements IDateInfoRepository {
 
     const [rows] = await poolToUse.query<RowDataPacket[]>(
       `SELECT id FROM date_info WHERE (location_date, date_name) IN (?)`,
-      [
-        dateNamePairs.map(({ locationDate, dateName }) => [
-          formatDateOnly(locationDate),
-          dateName,
-        ]),
-      ]
+      [dateNamePairs.map(({ locationDate, dateName }) => [formatDateOnly(locationDate), dateName])]
     );
 
     return rows.map((row) => row.id);

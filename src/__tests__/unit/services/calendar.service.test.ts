@@ -170,28 +170,17 @@ describe('CalendarService Unit Test', () => {
       ).rejects.toThrow('유효하지 않은 날짜 형식입니다');
     });
 
-    it('[UTC] 타임존 오프셋이 섞인 날짜도 UTC 기준으로 하루 목록이 생성되어야 한다', async () => {
-      mockCalendarRepository.slugExists.mockResolvedValue(false);
-      mockCalendarRepository.create.mockResolvedValue({
-        id: 1,
-        slug: 'test-slug',
-      } as Calendar);
-      mockParticipantRepository.create.mockResolvedValue({} as any);
-
-      await calendarService.createCalendar(
-        ownerId,
-        title,
-        '2026-04-28T00:30:00+09:00',
-        '2026-04-30T00:30:00+09:00',
-        hostNickname,
-        description
-      );
-
-      expect(mockDateOptionRepository.createBatch).toHaveBeenCalledWith(
-        1,
-        ['2026-04-27', '2026-04-28', '2026-04-29'],
-        expect.anything()
-      );
+    it('[실패] 날짜 전용 필드에 datetime이 들어오면 거부해야 한다', async () => {
+      await expect(
+        calendarService.createCalendar(
+          ownerId,
+          title,
+          '2026-04-28T00:30:00+09:00',
+          '2026-04-30T00:30:00+09:00',
+          hostNickname,
+          description
+        )
+      ).rejects.toThrow('유효하지 않은 날짜 형식입니다');
     });
 
     it('[실패] Slug 생성 충돌 시 재시도 로직이 동작해야 한다', async () => {

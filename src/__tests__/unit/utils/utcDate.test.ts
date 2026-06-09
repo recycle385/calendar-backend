@@ -9,18 +9,21 @@ import {
 } from '../../../utils/utcDate';
 
 describe('utcDate util', () => {
-  it('parseUtcDateOnly는 타임존이 섞인 시각도 UTC 날짜 자정으로 정규화해야 한다', () => {
-    const normalized = parseUtcDateOnly('2026-04-28T00:30:00+09:00');
+  it('parseUtcDateOnly는 YYYY-MM-DD만 UTC 날짜 자정으로 정규화해야 한다', () => {
+    const normalized = parseUtcDateOnly('2026-04-28');
 
-    expect(normalized.toISOString()).toBe('2026-04-27T00:00:00.000Z');
+    expect(normalized.toISOString()).toBe('2026-04-28T00:00:00.000Z');
+    expect(() => parseUtcDateOnly('2026-04-28T00:30:00+09:00')).toThrow(
+      '날짜는 YYYY-MM-DD 형식이어야 합니다'
+    );
   });
 
   it('formatUtcDateOnly는 UTC 기준 YYYY-MM-DD 문자열을 반환해야 한다', () => {
-    expect(formatUtcDateOnly('2026-04-28T23:30:00+09:00')).toBe('2026-04-28');
+    expect(formatUtcDateOnly('2026-04-28')).toBe('2026-04-28');
   });
 
   it('addUtcDays는 날짜 경계를 UTC 기준으로 이동해야 한다', () => {
-    const result = addUtcDays('2026-04-28T00:00:00.000Z', 3);
+    const result = addUtcDays('2026-04-28', 3);
 
     expect(result.toISOString()).toBe('2026-05-01T00:00:00.000Z');
   });

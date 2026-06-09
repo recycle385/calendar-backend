@@ -2,8 +2,14 @@ import { NextFunction, Request, Response } from 'express';
 import Joi from 'joi';
 
 import { VALID_DATE_KINDS } from '../models/DateInfo';
+import {
+  compareDateOnly,
+  daysBetweenDateOnly,
+  normalizeCompactDateOnly,
+  normalizeDateOnly,
+  parseDateOnlyToUtcDate,
+} from '../utils/dateOnly';
 import { Errors } from '../utils/errors';
-import { parseDateOnlyToUtcDate } from '../utils/dateOnly';
 
 const validationOptions = {
   abortEarly: false,
@@ -11,11 +17,25 @@ const validationOptions = {
   allowUnknown: false,
 };
 
-const formatDateString = (value: string) => value.split('T')[0];
+function normalizeDateOnlyForJoi(value: string, helpers: Joi.CustomHelpers) {
+  try {
+    return normalizeDateOnly(value);
+  } catch (err) {
+    return helpers.message({
+      custom: err instanceof Error ? err.message : '날짜 형식이 올바르지 않습니다',
+    } as any);
+  }
+}
 
-const formatDateStringForDateInfo = (value: string) => {
-  return value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-};
+function normalizeCompactDateOnlyForJoi(value: string, helpers: Joi.CustomHelpers) {
+  try {
+    return normalizeCompactDateOnly(value);
+  } catch (err) {
+    return helpers.message({
+      custom: err instanceof Error ? err.message : '날짜 형식이 올바르지 않습니다',
+    } as any);
+  }
+}
 
 export const validateBody = (schema: Joi.ObjectSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -98,15 +118,13 @@ export const commonSchemas = {
   dateRange: Joi.object({
     start_date: Joi.string()
       .trim()
-      .isoDate()
       .required()
-      .custom(formatDateString, 'Format to YYYY-MM-DD'),
+      .custom(normalizeDateOnlyForJoi, 'Normalize date-only string'),
     end_date: Joi.string()
       .trim()
-      .isoDate()
       .required()
       .custom(endDateVerifier)
-      .custom(formatDateString, 'Format to YYYY-MM-DD'),
+      .custom(normalizeDateOnlyForJoi, 'Normalize date-only string'),
   }),
 };
 
@@ -139,15 +157,13 @@ export const calendarSchemas = {
     description: Joi.string().trim().allow('', null).optional(),
     start_date: Joi.string()
       .trim()
-      .isoDate()
       .optional()
-      .custom(formatDateString, 'Format to YYYY-MM-DD'),
+      .custom(normalizeDateOnlyForJoi, 'Normalize date-only string'),
     end_date: Joi.string()
       .trim()
-      .isoDate()
       .optional()
       .custom(endDateVerifier)
-      .custom(formatDateString, 'Format to YYYY-MM-DD'),
+      .custom(normalizeDateOnlyForJoi, 'Normalize date-only string'),
   }),
 };
 
@@ -172,7 +188,10 @@ export const voteSchemas = {
   subVoteRequest: Joi.object({
     selectedDates: Joi.array()
       .items(
-        Joi.string().trim().isoDate().required().custom(formatDateString, 'Format to YYYY-MM-DD')
+        Joi.string()
+          .trim()
+          .required()
+          .custom(normalizeDateOnlyForJoi, 'Normalize date-only string')
       )
       .min(1)
       .unique()
@@ -196,10 +215,7 @@ const yearField = Joi.string()
 
 const locationDateField = Joi.string()
   .trim()
-  .pattern(/^\d{8}$/)
-  .messages({ 'string.pattern.base': 'locationDate는 YYYYMMDD 형식이어야 합니다' })
-  .custom(formatDateStringForDateInfo, 'Format to YYYY-MM-DD')
-  .isoDate();
+  .custom(normalizeCompactDateOnlyForJoi, 'Normalize compact date-only string');
 
 const dateKindField = Joi.string()
   .valid(...VALID_DATE_KINDS)
@@ -301,14 +317,23 @@ function endDateVerifier(value: string, helpers: Joi.CustomHelpers) {
   const startDate = helpers.state.ancestors[0].start_date;
   if (!startDate) return value;
 
-  const start = parseDateOnlyToUtcDate(startDate);
-  const end = parseDateOnlyToUtcDate(value);
+  let normalizedStart: string;
+  let normalizedEnd: string;
 
-  if (start > end) {
+  try {
+    normalizedStart = normalizeDateOnly(startDate);
+    normalizedEnd = normalizeDateOnly(value);
+  } catch (err) {
+    return helpers.message({
+      custom: err instanceof Error ? err.message : '날짜 형식이 올바르지 않습니다',
+    } as any);
+  }
+
+  if (compareDateOnly(normalizedStart, normalizedEnd) > 0) {
     return helpers.message({ custom: '종료일은 시작일보다 이전일 수 없습니다' } as any);
   }
 
-  const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+  const diffDays = daysBetweenDateOnly(normalizedStart, normalizedEnd);
   if (diffDays > 365) {
     return helpers.message({ custom: '투표 기간은 최대 1년까지 가능합니다' } as any);
   }

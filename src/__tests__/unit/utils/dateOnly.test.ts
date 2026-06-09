@@ -3,13 +3,25 @@ import {
   compareDateOnly,
   daysBetweenDateOnly,
   eachDateOnlyInRange,
-  formatDateOnly,
+  normalizeCompactDateOnly,
+  normalizeDateOnly,
   todayDateOnlyUtc,
 } from '../../../utils/dateOnly';
 
 describe('dateOnly util', () => {
-  it('formatDateOnly는 타임존 오프셋이 있는 입력도 UTC 기준 YYYY-MM-DD로 정규화해야 한다', () => {
-    expect(formatDateOnly('2026-04-28T00:30:00+09:00')).toBe('2026-04-27');
+  it('normalizeDateOnly는 YYYY-MM-DD만 허용해야 한다', () => {
+    expect(normalizeDateOnly('2026-04-28')).toBe('2026-04-28');
+    expect(() => normalizeDateOnly('2026-04-28T00:30:00+09:00')).toThrow(
+      '날짜는 YYYY-MM-DD 형식이어야 합니다'
+    );
+    expect(() => normalizeDateOnly('2026-04-31')).toThrow('유효하지 않은 날짜입니다');
+  });
+
+  it('normalizeCompactDateOnly는 YYYYMMDD를 YYYY-MM-DD로 정규화해야 한다', () => {
+    expect(normalizeCompactDateOnly('20260428')).toBe('2026-04-28');
+    expect(() => normalizeCompactDateOnly('2026-04-28')).toThrow(
+      '날짜는 YYYYMMDD 형식이어야 합니다'
+    );
   });
 
   it('addDateOnlyDays는 계산 결과를 YYYY-MM-DD 문자열로 반환해야 한다', () => {
