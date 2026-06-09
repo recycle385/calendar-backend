@@ -16,6 +16,7 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.env.test
 
 # 빌드 결과물
 dist/
@@ -41,3 +42,12 @@ coverage/
 
 # TypeScript 관련 (컴파일 히스토리)
 *.tsbuildinfo
+
+tree.txt
+results/
+docker-compose.test.yml
+hi.json
+k6/
+result.txt
+utc-time-unification-before-after.txt
+*.txt

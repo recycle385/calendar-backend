@@ -1,7 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
 import Joi from 'joi';
 
+import { VALID_DATE_KINDS } from '../models/DateInfo';
 import { Errors } from '../utils/errors';
+import { parseDateOnlyToUtcDate } from '../utils/dateOnly';
 
 const validationOptions = {
   abortEarly: false,
@@ -10,6 +12,10 @@ const validationOptions = {
 };
 
 const formatDateString = (value: string) => value.split('T')[0];
+
+const formatDateStringForDateInfo = (value: string) => {
+  return value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+};
 
 export const validateBody = (schema: Joi.ObjectSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -21,6 +27,27 @@ export const validateBody = (schema: Joi.ObjectSchema) => {
     }
 
     req.body = value;
+    // Normalize date strings to UTC date-only Date objects for dateInfo endpoints
+    try {
+      if (value && Array.isArray(value.dateInfos)) {
+        value.dateInfos.forEach((item: any) => {
+          if (item && typeof item.locationDate === 'string') {
+            item.locationDate = parseDateOnlyToUtcDate(item.locationDate);
+          }
+        });
+      }
+
+      if (value && Array.isArray(value.dateNamePairs)) {
+        value.dateNamePairs.forEach((item: any) => {
+          if (item && typeof item.locationDate === 'string') {
+            item.locationDate = parseDateOnlyToUtcDate(item.locationDate);
+          }
+        });
+      }
+    } catch (e) {
+      return next(Errors.ValidationError('날짜 변환 중 오류가 발생했습니다', e));
+    }
+
     next();
   };
 };
@@ -161,12 +188,121 @@ export const voteSchemas = {
   }),
 };
 
+// 공통 필드 조각
+const yearField = Joi.string()
+  .trim()
+  .pattern(/^\d{4}$/)
+  .messages({ 'string.pattern.base': 'year는 4자리 연도여야 합니다' });
+
+const locationDateField = Joi.string()
+  .trim()
+  .pattern(/^\d{8}$/)
+  .messages({ 'string.pattern.base': 'locationDate는 YYYYMMDD 형식이어야 합니다' })
+  .custom(formatDateStringForDateInfo, 'Format to YYYY-MM-DD')
+  .isoDate();
+
+const dateKindField = Joi.string()
+  .valid(...VALID_DATE_KINDS)
+  .messages({ 'any.only': `유효하지 않은 dateKind입니다` });
+
+// 공통 배열 조각
+const yearsArrayField = Joi.array().items(yearField);
+const dateKindsArrayField = Joi.array().items(dateKindField);
+
+// 단건 아이템
+const dateInfoItemSchema = Joi.object({
+  locationDate: locationDateField
+    .required()
+    .messages({ 'any.required': 'locationDate는 필수입니다' }),
+  year: yearField.required().messages({ 'any.required': 'year는 필수입니다' }),
+  seq: Joi.number().integer().min(1).required().messages({ 'any.required': 'seq는 필수입니다' }),
+  dateName: Joi.string()
+    .trim()
+    .min(1)
+    .required()
+    .messages({ 'any.required': 'dateName은 필수입니다' }),
+  dateKind: dateKindField.required().messages({ 'any.required': 'dateKind는 필수입니다' }),
+  isHoliday: Joi.boolean().required().messages({ 'any.required': 'isHoliday는 필수입니다' }),
+  dataSource: Joi.string().valid('custom').required().messages({
+    'any.required': 'dataSource는 필수입니다',
+    'any.only': 'dataSource는 custom만 허용됩니다',
+  }),
+});
+
+const dateNamePairSchema = Joi.object({
+  locationDate: locationDateField
+    .required()
+    .messages({ 'any.required': 'locationDate는 필수입니다' }),
+  dateName: Joi.string()
+    .trim()
+    .min(1)
+    .required()
+    .messages({ 'any.required': 'dateName은 필수입니다' }),
+});
+
+export const dateInfoSchemas = {
+  // POST /date-infos
+  createRequest: dateInfoItemSchema,
+
+  // POST /date-infos/batch
+  createBatchRequest: Joi.object({
+    dateInfos: Joi.array().items(dateInfoItemSchema).min(1).required().messages({
+      'any.required': 'dateInfos는 필수입니다',
+      'array.min': 'dateInfos는 최소 1개 이상이어야 합니다',
+    }),
+  }),
+
+  // GET|DELETE /date-infos/before?year=2025
+  yearQuery: Joi.object({
+    year: yearField.required().messages({ 'any.required': 'year는 필수입니다' }),
+  }),
+
+  yearsQuery: Joi.object({
+    years: yearsArrayField.min(1).required().messages({
+      'any.required': 'years는 필수입니다',
+      'array.min': 'years는 최소 1개 이상이어야 합니다',
+    }),
+  }),
+
+  // params /:year
+  yearParams: Joi.object({
+    year: yearField.required().messages({ 'any.required': 'year는 필수입니다' }),
+  }),
+
+  // GET /date-infos/:year/kinds?dateKinds[]=01
+  yearKindsQuery: Joi.object({
+    dateKinds: dateKindsArrayField.min(1).required().messages({
+      'any.required': 'dateKinds는 필수입니다',
+      'array.min': 'dateKinds는 최소 1개 이상이어야 합니다',
+    }),
+  }),
+
+  // GET /date-infos/kinds?years[]=2023&dateKinds[]=01
+  yearsAndKindsQuery: Joi.object({
+    years: yearsArrayField.min(1).required().messages({
+      'any.required': 'years는 필수입니다',
+      'array.min': 'years는 최소 1개 이상이어야 합니다',
+    }),
+    dateKinds: dateKindsArrayField.min(1).required().messages({
+      'any.required': 'dateKinds는 필수입니다',
+      'array.min': 'dateKinds는 최소 1개 이상이어야 합니다',
+    }),
+  }),
+
+  deleteByDatesAndNamesRequest: Joi.object({
+    dateNamePairs: Joi.array().items(dateNamePairSchema).min(1).required().messages({
+      'any.required': 'dateNamePairs는 필수입니다',
+      'array.min': 'dateNamePairs는 최소 1개 이상이어야 합니다',
+    }),
+  }),
+};
+
 function endDateVerifier(value: string, helpers: Joi.CustomHelpers) {
   const startDate = helpers.state.ancestors[0].start_date;
   if (!startDate) return value;
 
-  const start = new Date(startDate);
-  const end = new Date(value);
+  const start = parseDateOnlyToUtcDate(startDate);
+  const end = parseDateOnlyToUtcDate(value);
 
   if (start > end) {
     return helpers.message({ custom: '종료일은 시작일보다 이전일 수 없습니다' } as any);

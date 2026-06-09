@@ -135,7 +135,7 @@ describe('VoteService Unit Test', () => {
       const mockVoteStatus: DateVoteStatus[] = [
         {
           date_option_id: 10,
-          date_value: new Date('2025-01-01'),
+          date_value: '2025-01-01',
           is_enabled: true,
           votes: [
             {

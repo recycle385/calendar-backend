@@ -60,6 +60,9 @@ export const Errors = {
       errorCode: ErrorCode.EXTERNAL_API_ERROR,
     });
   },
+
+  BadGateway: (apiType: string, message = `${apiType} API 응답이 올바르지 않습니다.`) =>
+    new AppError(message, 502, { errorCode: ErrorCode.EXTERNAL_API_ERROR }),
 };
 
 export { AppError } from './AppError';

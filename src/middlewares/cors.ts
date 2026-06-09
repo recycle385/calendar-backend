@@ -3,7 +3,7 @@ import cors from 'cors';
 import { env } from '../config/env';
 import { Errors } from '../utils/errors';
 
-const allowedOrigins = [env.CLIENT_URL, 'https://your-production-site.com'];
+const allowedOrigins = [env.CLIENT_URL, env.BACKEND_URL];
 
 const corsOptions: cors.CorsOptions = {
   /**

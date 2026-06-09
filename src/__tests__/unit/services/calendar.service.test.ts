@@ -1,4 +1,7 @@
-import { CALENDAR_GRACE_PERIOD } from '../../../constants/calendar.constants';
+/// <reference types="jest" />
+
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+
 import { Calendar } from '../../../models/Calendar';
 import { ICalendarRepository } from '../../../repositories/calendar.repository';
 import { IDateOptionRepository } from '../../../repositories/dateOption.repository';
@@ -9,7 +12,7 @@ import { Errors } from '../../../utils/errors';
 // TransactionManager Mocking
 jest.mock('../../../infrastructure/transaction.manager', () => ({
   TransactionManager: {
-    run: jest.fn((callback) => callback({})), // 콜백을 즉시 실행
+    run: jest.fn((callback: (connection: object) => unknown) => callback({})), // 콜백을 즉시 실행
   },
 }));
 
@@ -167,6 +170,30 @@ describe('CalendarService Unit Test', () => {
       ).rejects.toThrow('유효하지 않은 날짜 형식입니다');
     });
 
+    it('[UTC] 타임존 오프셋이 섞인 날짜도 UTC 기준으로 하루 목록이 생성되어야 한다', async () => {
+      mockCalendarRepository.slugExists.mockResolvedValue(false);
+      mockCalendarRepository.create.mockResolvedValue({
+        id: 1,
+        slug: 'test-slug',
+      } as Calendar);
+      mockParticipantRepository.create.mockResolvedValue({} as any);
+
+      await calendarService.createCalendar(
+        ownerId,
+        title,
+        '2026-04-28T00:30:00+09:00',
+        '2026-04-30T00:30:00+09:00',
+        hostNickname,
+        description
+      );
+
+      expect(mockDateOptionRepository.createBatch).toHaveBeenCalledWith(
+        1,
+        ['2026-04-27', '2026-04-28', '2026-04-29'],
+        expect.anything()
+      );
+    });
+
     it('[실패] Slug 생성 충돌 시 재시도 로직이 동작해야 한다', async () => {
       // 첫 번째 호출 시 true(충돌), 두 번째 false(성공) 반환
       mockCalendarRepository.slugExists.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
@@ -217,8 +244,8 @@ describe('CalendarService Unit Test', () => {
       slug,
       owner_id: ownerId,
       title: 'Old Title',
-      start_date: new Date('2025-01-01'),
-      end_date: new Date('2025-01-03'),
+      start_date: '2025-01-01',
+      end_date: '2025-01-03',
       is_closed: false,
     } as Calendar;
 

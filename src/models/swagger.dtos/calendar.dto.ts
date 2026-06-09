@@ -30,10 +30,10 @@ import { DefaultResponseDto } from './common.dto';
  *           example: null
  *         start_date:
  *           type: string
- *           format: date-time
+ *           format: date
  *         end_date:
  *           type: string
- *           format: date-time
+ *           format: date
  *         is_closed:
  *           type: boolean
  *           example: false
@@ -52,8 +52,8 @@ export interface SafeCalendarDto {
   slug: string; // 랜덤 토큰 (Ab3dE9xR)
   title: string;
   description: string | null;
-  start_date: Date; // 투표 가능 시작일
-  end_date: Date; // 투표 가능 종료일
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
   is_closed: boolean; // 투표 마감 여부
   hostParticipantUuid: string; // useruuid가 아니라 participantuuid 넣어야함 (safe 응답용)
   created_at: Date;
@@ -200,10 +200,10 @@ export interface CommonCalendarResponse extends DefaultResponseDto {
  *           example: "ㅇㄹ"
  *         start_date:
  *           type: string
- *           format: date-time
+ *           format: date
  *         end_date:
  *           type: string
- *           format: date-time
+ *           format: date
  *         is_closed:
  *           type: boolean
  *           example: false

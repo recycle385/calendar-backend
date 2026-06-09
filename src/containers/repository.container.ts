@@ -1,6 +1,7 @@
 import pool from '../config/database';
 import { redisClient } from '../config/redis';
 import { CalendarRepository, ICalendarRepository } from '../repositories/calendar.repository';
+import { DateInfoRepository, IDateInfoRepository } from '../repositories/dateInfo.repository';
 import { DateOptionRepository, IDateOptionRepository } from '../repositories/dateOption.repository';
 import {
   IParticipantRepository,
@@ -18,6 +19,7 @@ export const dateOptionRepository: IDateOptionRepository = new DateOptionReposit
 export const participantRepository: IParticipantRepository = new ParticipantRepository(db);
 export const voteRepository: IVoteRepository = new VoteRepository(db);
 export const userRepository: IUserRepository = new UserRepository(db);
+export const dateInfoRepository: IDateInfoRepository = new DateInfoRepository(db);
 export const redisBlacklistRepository: IRedisBlacklistRepository = new RedisBlacklistRepository(
   redisClient
 );

@@ -5,7 +5,8 @@
     "start": "pm2 start ./dist/web.js --name tooniz",
     "stop": "pm2 stop tooniz",
     "reload": "pm2 reload tooniz",
-    "test": "cross-env NODE_ENV=test jest --detectOpenHandles"
+    "test": "cross-env NODE_ENV=test DB_HOST=127.0.0.1 DB_PORT=3307 REDIS_URL=redis://127.0.0.1:6380 jest --runInBand --detectOpenHandles",
+    "ktest": "npx dotenv-cli -e .env.test -- k6 run case2-read-stress.js"
   },
   "author": "hdr",
   "license": "ISC",
@@ -35,6 +36,8 @@
     "socket.io": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "tree-cli": "^0.6.7",
+    "tree-node-cli": "^3.0.0",
     "tsx": "^4.20.6",
     "uuid": "^11.1.0",
     "winston": "^3.18.3",

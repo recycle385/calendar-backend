@@ -1,4 +1,4 @@
-import { RequestHandler } from 'express';
+import { RequestHandler, Response } from 'express';
 
 import { env } from '../config/env';
 import { REFRESH_TOKEN_EXPIRES_IN } from '../constants/token.constants';
@@ -11,6 +11,15 @@ import { toSeconds } from '../utils/timeConverter';
 
 export class AuthController {
   constructor(private authService: IAuthService) {}
+
+  private cookieOptions = {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+  };
+
+  private clearRefreshTokenCookie(res: Response) {
+    res.clearCookie('jwt', this.cookieOptions);
+  }
 
   public redirectToGoogle: RequestHandler = async (req, res) => {
     const googleLoginUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${env.CLIENT_URL}/auth/callback&response_type=code&scope=email profile`;
@@ -33,8 +42,7 @@ export class AuthController {
     }
 
     res.cookie('jwt', oAuthCallbackResponse.token.refreshToken, {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
+      ...this.cookieOptions,
       maxAge: toSeconds(REFRESH_TOKEN_EXPIRES_IN),
     });
 
@@ -52,8 +60,7 @@ export class AuthController {
     const signupResponse = await this.authService.handleGoogleSignup(signupToken, isTermsAgreed);
 
     res.cookie('jwt', signupResponse.tokenPair.refreshToken, {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
+      ...this.cookieOptions,
       maxAge: toSeconds(REFRESH_TOKEN_EXPIRES_IN),
     });
 
@@ -67,35 +74,38 @@ export class AuthController {
   public refreshToken: RequestHandler = async (req, res) => {
     const refreshTokenCookie = req.cookies.jwt;
     if (!refreshTokenCookie) {
+      this.clearRefreshTokenCookie(res);
       throw Errors.Unauthorized('Refresh Token이 제공되지 않았습니다');
     }
 
-    const newTokenPair: TokenPair = await this.authService.refreshToken(refreshTokenCookie);
+    try {
+      const newTokenPair: TokenPair = await this.authService.refreshToken(refreshTokenCookie);
 
-    res.cookie('jwt', newTokenPair.refreshToken, {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      maxAge: toSeconds(REFRESH_TOKEN_EXPIRES_IN),
-    });
+      res.cookie('jwt', newTokenPair.refreshToken, {
+        ...this.cookieOptions,
+        maxAge: toSeconds(REFRESH_TOKEN_EXPIRES_IN),
+      });
 
-    return res.status(200).json({
-      message: '토큰 갱신 성공',
-      accessToken: newTokenPair.accessToken,
-    });
+      return res.status(200).json({
+        message: '토큰 갱신 성공',
+        accessToken: newTokenPair.accessToken,
+      });
+    } catch (err) {
+      this.clearRefreshTokenCookie(res);
+      throw err;
+    }
   };
 
   public logout: RequestHandler = async (req, res) => {
     const refreshTokenCookie = req.cookies.jwt;
     if (!refreshTokenCookie) {
+      this.clearRefreshTokenCookie(res);
       throw Errors.Unauthorized('Refresh Token이 제공되지 않았습니다');
     }
 
     await this.authService.revokeRefreshToken(refreshTokenCookie);
 
-    res.clearCookie('jwt', {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-    });
+    this.clearRefreshTokenCookie(res);
 
     return res.status(200).json({ message: '로그아웃 성공' });
   };

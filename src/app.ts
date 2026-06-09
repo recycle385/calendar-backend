@@ -1,6 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 
+import { env } from './config/env';
 import { API_PREFIX } from './constants/routes.constants';
 import {
   corsMiddleware,
@@ -20,7 +21,10 @@ app.use(corsMiddleware);
 registerMiddlewares(app);
 
 app.use(requestLogger);
-app.use(API_PREFIX, rateLimiter);
+
+if (env.ENABLE_RATE_LIMIT === 'true') {
+  app.use(API_PREFIX, rateLimiter);
+}
 
 app.use(API_PREFIX, routes);
 

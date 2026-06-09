@@ -256,23 +256,30 @@ export class ParticipantRepository implements IParticipantRepository {
     const poolToUse = connection || this.pool;
 
     const [rows] = await poolToUse.execute<RowDataPacket[]>(
-      `SELECT
-        p.*,
-        COUNT(DISTINCT v.date_option_id) as vote_count,
-        (SELECT COUNT(*) FROM date_options WHERE calendar_id = ?) as total_dates
-       FROM participants p
-       LEFT JOIN votes v ON p.id = v.participant_id
-       WHERE p.calendar_id = ?
-       GROUP BY p.id
-       ORDER BY p.joined_at ASC`,
-      [calendarId, calendarId]
+      `SELECT p.*, COUNT(DISTINCT v.date_option_id) as vote_count
+      FROM participants p
+      LEFT JOIN votes v ON p.id = v.participant_id
+      WHERE p.calendar_id = ?
+      GROUP BY p.id
+      ORDER BY p.joined_at ASC`,
+      [calendarId]
     );
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const [dateCountRow] = await poolToUse.execute<RowDataPacket[]>(
+      'SELECT COUNT(*) as count FROM date_options WHERE calendar_id = ?',
+      [calendarId]
+    );
+    const totalDates = Number(dateCountRow[0].count);
 
     return rows.map((row) => ({
       ...this.mapToParticipant(row),
       vote_count: Number(row.vote_count),
-      total_dates: Number(row.total_dates),
-      vote_rate: row.total_dates > 0 ? (Number(row.vote_count) / Number(row.total_dates)) * 100 : 0,
+      total_dates: totalDates,
+      vote_rate: totalDates > 0 ? (Number(row.vote_count) / totalDates) * 100 : 0,
     }));
   }
 

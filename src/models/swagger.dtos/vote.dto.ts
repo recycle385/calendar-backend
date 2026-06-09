@@ -37,7 +37,7 @@ export type VoteTypeForDto = 'available' | 'unavailable' | 'maybe';
  */
 export interface VoteRecord {
   vote_id: number;
-  date_value: Date | string;
+  date_value: string;
   vote_type: VoteTypeForDto;
   created_at: Date;
 }
@@ -123,7 +123,7 @@ export interface SubmitVoteResponse extends DefaultResponseDto {
  */
 interface DateVoteStatusDto {
   date_option_id: number;
-  date_value: Date;
+  date_value: string;
   is_enabled: boolean;
   votes: {
     participant_id: number;

@@ -2,16 +2,29 @@ import mysql from 'mysql2/promise';
 
 import { env } from './env';
 
+const MYSQL_UTC_TIME_ZONE = '+00:00';
+
 const pool = mysql.createPool({
   host: env.DB_HOST,
+  port: Number(process.env.DB_PORT) || 3306,
   user: env.DB_USER,
   password: env.DB_USER_PASSWORD,
   database: env.DB_NAME,
+  timezone: 'Z',
+  dateStrings: ['DATE'],
   waitForConnections: true,
   connectionLimit: env.DB_CONNECTION_LIMIT,
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
+});
+
+pool.on('connection', (connection) => {
+  connection.query(`SET time_zone = '${MYSQL_UTC_TIME_ZONE}'`, (err: Error | null) => {
+    if (err) {
+      console.error('DB 세션 타임존 UTC 설정 실패:', err);
+    }
+  });
 });
 
 /**
@@ -25,6 +38,7 @@ export async function connectDatabaseWithRetry(retries = 5, initialDelayMs = 200
   for (let i = 0; i < retries; i++) {
     try {
       const connection = await pool.getConnection();
+      await connection.query(`SET time_zone = '${MYSQL_UTC_TIME_ZONE}'`);
       console.log('데이터베이스 연결 성공');
       connection.release();
       return;

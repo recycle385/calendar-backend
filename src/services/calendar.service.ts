@@ -1,5 +1,4 @@
-import crypto from 'crypto';
-import { randomUUID } from 'crypto';
+import crypto, { randomUUID } from 'crypto';
 
 import { env } from '../config/env';
 import { CALENDAR_GRACE_PERIOD } from '../constants/calendar.constants';
@@ -13,6 +12,13 @@ import {
 import { ICalendarRepository } from '../repositories/calendar.repository';
 import { IDateOptionRepository } from '../repositories/dateOption.repository';
 import { IParticipantRepository } from '../repositories/participant.repository';
+import {
+  addDateOnlyDays,
+  compareDateOnly,
+  daysBetweenDateOnly,
+  eachDateOnlyInRange,
+  formatDateOnly,
+} from '../utils/dateOnly';
 import { Errors } from '../utils/errors';
 
 export interface ICalendarService {
@@ -70,44 +76,37 @@ export class CalendarService implements ICalendarService {
   /**
    * 날짜 유효성 검증
    */
-  private validateDateRange(startDate: string, endDate: string): void {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  private validateDateRange(
+    startDate: string,
+    endDate: string
+  ): { startDate: string; endDate: string } {
+    let normalizedStart: string;
+    let normalizedEnd: string;
 
-    // 날짜 형식 검증
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    try {
+      normalizedStart = formatDateOnly(startDate);
+      normalizedEnd = formatDateOnly(endDate);
+    } catch {
       throw Errors.BadRequest('유효하지 않은 날짜 형식입니다 (YYYY-MM-DD)');
     }
 
     // 시작일이 종료일보다 이후인 경우
-    if (start > end) {
+    if (compareDateOnly(normalizedStart, normalizedEnd) > 0) {
       throw Errors.BadRequest('시작일은 종료일보다 이전이어야 합니다');
     }
 
     // 과거 날짜 체크 (선택사항 - 필요시 주석 해제)
-    // if (start < today) {
+    // if (compareDateOnly(normalizedStart, todayDateOnlyUtc()) < 0) {
     //   throw Errors.BadRequest('시작일은 오늘 이후여야 합니다');
     // }
 
     // 기간이 너무 긴 경우 (1년 이상)
-    const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+    const diffDays = daysBetweenDateOnly(normalizedStart, normalizedEnd);
     if (diffDays > 365) {
       throw Errors.BadRequest('투표 기간은 최대 1년까지 가능합니다');
     }
-  }
 
-  private addDate(baseDate: string | Date, datesToAdd: number): string {
-    const targetDate = new Date(baseDate);
-
-    targetDate.setDate(targetDate.getDate() + datesToAdd);
-
-    const year = targetDate.getFullYear();
-    const month = String(targetDate.getMonth() + 1).padStart(2, '0'); // 월은 0부터 시작하므로 +1
-    const day = String(targetDate.getDate()).padStart(2, '0');
-
-    return `${year}-${month}-${day}`;
+    return { startDate: normalizedStart, endDate: normalizedEnd };
   }
 
   /**
@@ -130,9 +129,9 @@ export class CalendarService implements ICalendarService {
       throw Errors.BadRequest('캘린더 제목은 100자 이하여야 합니다');
     }
 
-    this.validateDateRange(startDate, endDate);
+    const dateRange = this.validateDateRange(startDate, endDate);
 
-    const expired_at = this.addDate(endDate, CALENDAR_GRACE_PERIOD);
+    const expired_at = addDateOnlyDays(dateRange.endDate, CALENDAR_GRACE_PERIOD);
 
     // 고유한 slug 생성
     const slug = await this.generateUniqueSlug();
@@ -141,22 +140,15 @@ export class CalendarService implements ICalendarService {
         slug,
         title: title.trim(),
         description: description?.trim(),
-        start_date: startDate,
-        end_date: endDate,
+        start_date: dateRange.startDate,
+        end_date: dateRange.endDate,
         owner_id: ownerId,
         expired_at: expired_at,
       };
 
       const calendar = await this.calendarRepository.create(input, con);
 
-      const dateList: string[] = [];
-      const currentDate = new Date(startDate);
-      const end = new Date(endDate);
-
-      while (currentDate <= end) {
-        dateList.push(currentDate.toISOString().split('T')[0]); // YYYY-MM-DD
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
+      const dateList = eachDateOnlyInRange(dateRange.startDate, dateRange.endDate);
 
       await this.dateOptionRepository.createBatch(calendar.id, dateList, con);
 
@@ -245,15 +237,23 @@ export class CalendarService implements ICalendarService {
       throw Errors.BadRequest('마감된 캘린더는 수정할 수 없습니다');
     }
 
-    if (input.end_date !== undefined) {
-      input.expired_at = this.addDate(input.end_date, CALENDAR_GRACE_PERIOD);
-    }
+    const hasStartDate = input.start_date !== undefined;
+    const hasEndDate = input.end_date !== undefined;
 
     // 날짜 범위 검증
-    if (input.start_date || input.end_date) {
+    if (hasStartDate || hasEndDate) {
       const startDate = input.start_date || calendar.start_date;
       const endDate = input.end_date || calendar.end_date;
-      this.validateDateRange(startDate.toString(), endDate.toString());
+      const dateRange = this.validateDateRange(startDate.toString(), endDate.toString());
+
+      if (hasStartDate) {
+        input.start_date = dateRange.startDate;
+      }
+
+      if (hasEndDate) {
+        input.end_date = dateRange.endDate;
+        input.expired_at = addDateOnlyDays(dateRange.endDate, CALENDAR_GRACE_PERIOD);
+      }
     }
 
     const updated = await this.calendarRepository.update(calendar.id, input);

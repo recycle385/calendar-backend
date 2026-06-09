@@ -90,7 +90,12 @@ export class TokenService implements ITokenService {
     }
 
     if (payload.iat) {
-      const userRevokedAt = await this.redisBlacklist.getUserAndRevokedAt(payload.sub);
+      const userRevokedAt = await this.redisBlacklist
+        .getUserAndRevokedAt(payload.sub)
+        .catch((err) => {
+          logger.error('리프레쉬 토큰 사용자 블랙리스트 확인 중 오류 발생:', err);
+          return null;
+        });
 
       if (userRevokedAt && userRevokedAt >= payload.iat!) {
         await this.revokeAllRefreshTokens(payload.sub);

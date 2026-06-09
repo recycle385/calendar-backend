@@ -5,7 +5,7 @@
 export interface DateOption {
   id: number;
   calendar_id: number;
-  date_value: Date; // DATE 타입 (시간 없음)
+  date_value: string; // YYYY-MM-DD
   is_enabled: boolean;
   created_at: Date;
 }

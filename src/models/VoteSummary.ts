@@ -21,7 +21,7 @@ export interface VoteSummaryWithRate extends VoteSummary {
 
 // 날짜별 집계 조회용
 export interface DateSummary {
-  date_value: Date;
+  date_value: string;
   is_enabled: boolean;
   summary: VoteSummary;
   vote_rate: number;

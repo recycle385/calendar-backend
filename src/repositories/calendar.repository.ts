@@ -4,7 +4,9 @@ import { PoolConnection } from 'mysql2/promise';
 import dbpool from '../config/database';
 import { Calendar, CreateCalendarInput, UpdateCalendarInput } from '../models/Calendar';
 import { CalendarWithHostUuid } from '../models/Calendar';
+import { DateOnlyInput, formatDateOnly, todayDateOnlyUtc } from '../utils/dateOnly';
 import { Errors } from '../utils/errors';
+import { formatUtcDateTimeForSql } from '../utils/utcDate';
 
 export interface ICalendarRepository {
   create(input: CreateCalendarInput, connection?: PoolConnection): Promise<Calendar>;
@@ -22,8 +24,8 @@ export interface ICalendarRepository {
     connection?: PoolConnection
   ): Promise<CalendarWithHostUuid[]>;
   slugExists(slug: string, connection?: PoolConnection): Promise<boolean>;
-  findEndedAndOpen(connection?: PoolConnection): Promise<Calendar[]>;
-  findExpired(connection?: PoolConnection): Promise<Calendar[]>;
+  findEndedAndOpen(connection?: PoolConnection, referenceDate?: DateOnlyInput): Promise<Calendar[]>;
+  findExpired(connection?: PoolConnection, referenceTime?: Date): Promise<Calendar[]>;
 }
 
 export class CalendarRepository implements ICalendarRepository {
@@ -40,7 +42,15 @@ export class CalendarRepository implements ICalendarRepository {
     const [result] = await poolToUse.execute<ResultSetHeader>(
       `INSERT INTO calendars (slug, title, description, start_date, end_date, owner_id, expired_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [slug, title, description || null, start_date, end_date, owner_id, expired_at]
+      [
+        slug,
+        title,
+        description || null,
+        formatDateOnly(start_date),
+        formatDateOnly(end_date),
+        owner_id,
+        expired_at,
+      ]
     );
 
     const calendar = await this.findById(result.insertId, connection);
@@ -141,12 +151,12 @@ export class CalendarRepository implements ICalendarRepository {
 
     if (input.start_date !== undefined) {
       updates.push('start_date = ?');
-      values.push(input.start_date);
+      values.push(formatDateOnly(input.start_date));
     }
 
     if (input.end_date !== undefined) {
       updates.push('end_date = ?');
-      values.push(input.end_date);
+      values.push(formatDateOnly(input.end_date));
     }
 
     if (input.is_closed !== undefined) {
@@ -237,21 +247,26 @@ export class CalendarRepository implements ICalendarRepository {
     return rows[0].count > 0;
   }
 
-  async findEndedAndOpen(connection?: PoolConnection): Promise<Calendar[]> {
+  async findEndedAndOpen(
+    connection?: PoolConnection,
+    referenceDate: DateOnlyInput = todayDateOnlyUtc()
+  ): Promise<Calendar[]> {
     const poolToUse = connection || this.pool;
 
     const [rows] = await poolToUse.execute<RowDataPacket[]>(
-      'SELECT * FROM calendars WHERE is_closed = FALSE AND end_date < CURDATE()'
+      'SELECT * FROM calendars WHERE is_closed = FALSE AND end_date < ?',
+      [formatDateOnly(referenceDate)]
     );
 
     return rows.map((row) => this.mapToCalendar(row));
   }
 
-  async findExpired(connection?: PoolConnection): Promise<Calendar[]> {
+  async findExpired(connection?: PoolConnection, referenceTime = new Date()): Promise<Calendar[]> {
     const poolToUse = connection || this.pool;
 
     const [rows] = await poolToUse.execute<RowDataPacket[]>(
-      'SELECT id FROM calendars WHERE expired_at < NOW()'
+      'SELECT id FROM calendars WHERE expired_at < ?',
+      [formatUtcDateTimeForSql(referenceTime)]
     );
 
     return rows.map((row) => this.mapToCalendar(row));
@@ -287,8 +302,8 @@ export class CalendarRepository implements ICalendarRepository {
       slug: row.slug,
       title: row.title,
       description: row.description,
-      start_date: new Date(row.start_date),
-      end_date: new Date(row.end_date),
+      start_date: formatDateOnly(row.start_date),
+      end_date: formatDateOnly(row.end_date),
       is_closed: Boolean(row.is_closed),
       owner_id: row.owner_id,
       created_at: new Date(row.created_at),

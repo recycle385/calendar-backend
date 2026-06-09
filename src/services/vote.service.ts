@@ -32,40 +32,23 @@ export class VoteService implements IVoteService {
     selectedDates: string[],
     voteType: VoteType = 'available'
   ): Promise<number> {
-    return TransactionManager.run(async (connection) => {
-      if (!selectedDates || selectedDates.length === 0) {
-        throw Errors.BadRequest('최소 하나 이상의 날짜를 선택해야 합니다');
-      }
+    const dateOption = await this.dateOptionRepository.findDateOptionsByCalendarAndDate(
+      calendarId,
+      selectedDates
+    );
 
-      // 날짜 옵션 ID 조회
-      const dateOption = await this.dateOptionRepository.findDateOptionsByCalendarAndDate(
-        calendarId,
-        selectedDates,
-        connection
-      );
+    if (dateOption.length !== selectedDates.length) {
+      throw Errors.BadRequest('유효하지 않은 날짜가 포함되어 있습니다');
+    }
 
-      if (dateOption.length !== selectedDates.length) {
-        throw Errors.BadRequest('유효하지 않은 날짜가 포함되어 있습니다');
-      }
-
-      const dateOptionIds: number[] = [];
-
-      for (const option of dateOption) {
-        if (!option.is_enabled) {
-          throw Errors.BadRequest(`비활성화된 날짜입니다: ${option.date_value}`);
-        }
-        dateOptionIds.push(option.id);
-      }
-
-      const count = await this.voteRepository.upsertVotes(
-        participantId,
-        dateOptionIds,
-        voteType, // 기본값: 가능,
-        connection
-      );
-
-      return count;
+    const dateOptionIds = dateOption.map((option) => {
+      if (!option.is_enabled) throw Errors.BadRequest(`비활성화된 날짜입니다`);
+      return option.id;
     });
+
+    const count = await this.voteRepository.upsertVotes(participantId, dateOptionIds, voteType);
+
+    return count;
   }
 
   /**

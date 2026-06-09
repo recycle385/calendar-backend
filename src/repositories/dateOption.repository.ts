@@ -3,6 +3,7 @@ import { PoolConnection } from 'mysql2/promise';
 
 import dbpool from '../config/database';
 import { CreateDateOptionInput, DateOption } from '../models/DateOption';
+import { formatDateOnly } from '../utils/dateOnly';
 import { Errors } from '../utils/errors';
 
 export interface IDateOptionRepository {
@@ -36,7 +37,7 @@ export class DateOptionRepository implements IDateOptionRepository {
     const [result] = await poolToUse.execute<ResultSetHeader>(
       `INSERT INTO date_options (calendar_id, date_value, is_enabled)
        VALUES (?, ?, ?)`,
-      [calendar_id, date_value, is_enabled ?? true]
+      [calendar_id, formatDateOnly(date_value), is_enabled ?? true]
     );
 
     const dateOption = await this.findById(result.insertId, connection);
@@ -58,7 +59,8 @@ export class DateOptionRepository implements IDateOptionRepository {
       return 0;
     }
 
-    const values = dates.map((date) => [calendarId, date, true]);
+    const sortedDates = [...dates].sort();
+    const values = sortedDates.map((date) => [calendarId, formatDateOnly(date), true]);
 
     const [result] = await poolToUse.query<ResultSetHeader>(
       `INSERT INTO date_options (calendar_id, date_value, is_enabled)
@@ -181,7 +183,7 @@ export class DateOptionRepository implements IDateOptionRepository {
     return {
       id: row.id,
       calendar_id: row.calendar_id,
-      date_value: new Date(row.date_value),
+      date_value: formatDateOnly(row.date_value),
       is_enabled: Boolean(row.is_enabled),
       created_at: new Date(row.created_at),
     };

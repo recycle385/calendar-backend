@@ -33,14 +33,14 @@ export interface VoteWithDetails extends Vote {
   };
   date_option: {
     id: number;
-    date_value: Date;
+    date_value: string;
   };
 }
 
 // 날짜별 투표 현황 (그리드 표시용)
 export interface DateVoteStatus {
   date_option_id: number;
-  date_value: Date;
+  date_value: string;
   is_enabled: boolean;
   votes: {
     participant_id: number;
@@ -53,5 +53,5 @@ export interface DateVoteStatus {
 export interface VoteRecordForParticipant
   extends Omit<Vote, 'id' | 'participant_id' | 'date_option_id' | 'updated_at'> {
   vote_id: number;
-  date_value: Date | string;
+  date_value: string;
 }

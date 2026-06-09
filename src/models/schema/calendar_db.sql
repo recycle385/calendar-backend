@@ -42,7 +42,22 @@ CREATE TABLE calendars (
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3. 참가자 테이블 (닉네임 + 비밀번호)
+-- 3. 공휴일 테이블
+CREATE TABLE date_info (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    location_date DATE NOT NULL COMMENT '날짜',
+    year CHAR(4) NOT NULL COMMENT '연도',
+    seq INT NOT NULL COMMENT '날짜별 순번 (같은 날짜에 여러 기념일이 있을 수 있음)',
+    date_name VARCHAR(100) NOT NULL COMMENT '기념일 명',
+    date_kind ENUM('01','02','03','04','05') Not null COMMENT '날짜 종류 (01: 휴일(빨간날), 02: 국경일, 03: 기념일, 04: 24절기, 05: 잡절)',
+    is_holiday BOOLEAN DEFAULT TRUE COMMENT '실제 휴무일 여부',
+    data_source ENUM('public-api','custom') DEFAULT 'public-api' COMMENT '데이터 출처',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE KEY unique_date_seq (location_date, seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4. 참가자 테이블 (닉네임 + 비밀번호)
 CREATE TABLE participants (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     participant_uuid CHAR(36) NOT NULL UNIQUE,
@@ -60,7 +75,7 @@ CREATE TABLE participants (
     INDEX idx_calendar_id (calendar_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 4. 날짜 옵션 테이블 (투표 대상 날짜들)
+-- 5. 날짜 옵션 테이블 (투표 대상 날짜들)
 CREATE TABLE date_options (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     calendar_id BIGINT NOT NULL,
@@ -73,7 +88,7 @@ CREATE TABLE date_options (
     INDEX idx_calendar_date (calendar_id, date_value)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 5. 투표 테이블
+-- 6. 투표 테이블
 CREATE TABLE votes (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     participant_id BIGINT NOT NULL,

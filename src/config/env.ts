@@ -1,8 +1,11 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config();
-
+if (process.env.NODE_ENV === 'test') {
+  dotenv.config({ path: path.join(process.cwd(), '.env.test') });
+} else {
+  dotenv.config();
+}
 interface EnvConfig {
   PORT: number;
   NODE_ENV: string;
@@ -20,6 +23,8 @@ interface EnvConfig {
   BACKEND_URL: string;
   SIGNUP_MODE: string;
   DB_CONNECTION_LIMIT: number;
+  ENABLE_RATE_LIMIT: string;
+  HOST_ACCESS_TOKEN?: string;
 }
 
 function validateEnv(): EnvConfig {
@@ -40,6 +45,7 @@ function validateEnv(): EnvConfig {
     'BACKEND_URL',
     'SIGNUP_MODE',
     'DB_CONNECTION_LIMIT',
+    'ENABLE_RATE_LIMIT',
   ];
 
   const missing = required.filter((key) => !process.env[key]);
@@ -76,6 +82,8 @@ function validateEnv(): EnvConfig {
     BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:4000',
     SIGNUP_MODE: process.env.SIGNUP_MODE!,
     DB_CONNECTION_LIMIT: connectionLimit,
+    ENABLE_RATE_LIMIT: process.env.ENABLE_RATE_LIMIT!,
+    HOST_ACCESS_TOKEN: process.env.HOST_ACCESS_TOKEN,
   };
 }
 

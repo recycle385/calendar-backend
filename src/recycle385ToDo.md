@@ -43,3 +43,27 @@ getRestDeInfo
 getHoliDeInfo
 getAnniversaryInfo
 get24DivisionsInfo
+getSundryDayInfo
+{
+"response": {
+"header": {
+"resultCode": "00",
+"resultMsg": "NORMAL SERVICE."
+},
+"body": {
+"items": {
+"item": [
+{
+"dateKind": "01",
+"dateName": "신정",
+"isHoliday": "Y",
+"locdate": 20160101,
+"seq": 1
+},]
+}
+"numOfRows": 10,
+"pageNo": 1,
+"totalCount": 19
+}
+}
+}

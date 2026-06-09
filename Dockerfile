@@ -1,5 +1,6 @@
 # 1단계: 빌드 환경
 FROM node:20-alpine AS builder
+ENV TZ=UTC
 WORKDIR /usr/src/app
 COPY package*.json ./
 # npm을 사용하여 의존성 설치
@@ -9,6 +10,7 @@ RUN npm run build
 
 # 2단계: 프로덕션 환경
 FROM node:20-alpine
+ENV TZ=UTC
 WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm install

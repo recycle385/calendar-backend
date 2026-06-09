@@ -5,6 +5,7 @@ import { ICalendarService } from '../services/calendar.service';
 import { IParticipantService } from '../services/participant.service';
 import { IVoteService } from '../services/vote.service';
 import { getIO } from '../sockets';
+import { compareDateOnly, todayDateOnlyUtc } from '../utils/dateOnly';
 import { Errors } from '../utils/errors';
 
 export class VoteController {
@@ -33,12 +34,7 @@ export class VoteController {
       throw Errors.BadRequest('마감된 캘린더에는 투표할 수 없습니다');
     }
 
-    const endDate = new Date(calendar.end_date);
-
-    const todayZero = new Date();
-    todayZero.setHours(0, 0, 0, 0);
-
-    if (todayZero > endDate) {
+    if (compareDateOnly(todayDateOnlyUtc(), calendar.end_date) > 0) {
       throw Errors.BadRequest('투표 기간이 종료되었습니다');
     }
 

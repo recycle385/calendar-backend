@@ -1,37 +1,43 @@
-//API 기본 접두사
 export const API_PREFIX = '/api/v1';
 
-//auth 관련 접두사
 export const AUTH_ROUTES = {
   BASE: '/auth',
 
-  // Google OAuth
   GOOGLE: '/google',
   GOOGLE_CALLBACK: '/google/callback',
 
-  // 신규 사용자 최종 등록 및 로그인
   SIGNUP: '/register',
 
-  // 토큰 갱신
   REFRESH: '/refresh',
 
-  // 로그아웃
   LOGOUT: '/logout',
 };
 
-//proxy 관련 접두사
-export const PROXY_ROUTES = {
-  BASE: '/proxy',
-  PUBLIC_DATA: '/publicdata',
+export const DATE_INFO_ROUTES = {
+  BASE: '/date-infos',
+
+  // 생성
+  CREATE: '/', // POST /date-infos
+  CREATE_BATCH: '/batch', // POST /date-infos/batch
+
+  // 조회
+  GET_ALL: '/', // GET /date-infos
+  GET_BY_YEARS: '/years', // GET /date-infos/years?years[]=2023&years[]=2024
+  GET_BEFORE: '/before', // GET /date-infos/before?year=2025
+  GET_BY_YEARS_AND_KINDS: '/kinds', // GET /date-infos/kinds?years[]=2023&dateKinds[]=01
+  GET_BY_YEAR_AND_KINDS: '/:year/kinds', // GET /date-infos/2025/kinds?dateKinds[]=01
+  GET_BY_YEAR: '/:year', // GET /date-infos/2025
+
+  // 삭제
+  DELETE_BEFORE: '/before', // DELETE /date-infos/before?year=2025
+  DELETE_BY_DATES_AND_NAMES: '/', // DELETE /date-infos body: { dateNamePairs: [...] }
 };
 
-//calendar 관련 접두사
 export const CALENDAR_ROUTES = {
   BASE: '/calendars',
 
   MY_CALENDAR_LIST: '/my',
 
-  // 캘린더 조회 수정 삭제
   CALENDAR_SLUG: '/:slug',
 
   CALENDAR_CLOSE: '/:slug/close',

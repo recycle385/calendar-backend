@@ -4,6 +4,7 @@ import { PoolConnection } from 'mysql2/promise';
 import dbpool from '../config/database';
 import { DateOption } from '../models/DateOption';
 import { CreateVoteInput, DateVoteStatus, Vote, VoteType } from '../models/Vote';
+import { formatDateOnly } from '../utils/dateOnly';
 import { Errors } from '../utils/errors';
 
 export interface IVoteRepository {
@@ -77,15 +78,15 @@ export class VoteRepository implements IVoteRepository {
       return 0;
     }
 
-    // 참가자의 기존 투표 모두 삭제
-    await this.deleteAllByParticipant(participantId, connection);
-
-    // 새로운 투표 일괄 삽입
-    const values = dateOptionIds.map((dateOptionId) => [participantId, dateOptionId, voteType]);
+    const sortedIds = [...dateOptionIds].sort((a, b) => a - b);
+    const values = sortedIds.map((dateOptionId) => [participantId, dateOptionId, voteType]);
 
     const [result] = await poolToUse.query<ResultSetHeader>(
       `INSERT INTO votes (participant_id, date_option_id, vote_type)
-       VALUES ?`,
+       VALUES ?
+       ON DUPLICATE KEY UPDATE 
+        vote_type = VALUES(vote_type),
+        updated_at = CURRENT_TIMESTAMP`,
       [values]
     );
 
@@ -139,6 +140,7 @@ export class VoteRepository implements IVoteRepository {
        FROM votes v
        JOIN date_options d ON v.date_option_id = d.id
        WHERE d.calendar_id = ?
+
        ORDER BY v.created_at ASC`,
       [calendarId]
     );
@@ -216,7 +218,7 @@ export class VoteRepository implements IVoteRepository {
       if (!dateMap.has(dateOptionId)) {
         dateMap.set(dateOptionId, {
           date_option_id: dateOptionId,
-          date_value: new Date(row.date_value),
+          date_value: formatDateOnly(row.date_value),
           is_enabled: Boolean(row.is_enabled),
           votes: [],
         });
