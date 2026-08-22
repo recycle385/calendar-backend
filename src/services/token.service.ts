@@ -17,6 +17,15 @@ import { toSeconds } from '../utils/timeConverter';
 export class TokenService implements ITokenService {
   constructor(private redisBlacklist: IRedisBlacklistRepository) {}
 
+  private async useAuthStore<T>(operation: string, task: () => Promise<T>): Promise<T> {
+    try {
+      return await task();
+    } catch (error) {
+      logger.error(`인증 저장소 ${operation} 실패`, error);
+      throw Errors.ServiceUnavailable();
+    }
+  }
+
   /*
     토큰에 대한 단일 책임을 위해 퍼사드 패턴으로 jwt 유틸 메서드 호출 후 반환 --------------------------------
 */
@@ -72,10 +81,9 @@ export class TokenService implements ITokenService {
   public async verifyRefreshToken(token: string): Promise<RefreshTokenPayload> {
     const payload = jwt.verifyRefreshTokenSignature(token);
 
-    const tokenRevokedAt = await this.redisBlacklist.isOnBlacklist(payload.tokenId).catch((err) => {
-      logger.error('리프레쉬 토큰 블랙리스트 확인 중 오류 발생:', err);
-      return null;
-    });
+    const tokenRevokedAt = await this.useAuthStore('토큰 블랙리스트 조회', () =>
+      this.redisBlacklist.isOnBlacklist(payload.tokenId)
+    );
 
     if (tokenRevokedAt !== null) {
       // 초 단위 통일
@@ -90,12 +98,9 @@ export class TokenService implements ITokenService {
     }
 
     if (payload.iat) {
-      const userRevokedAt = await this.redisBlacklist
-        .getUserAndRevokedAt(payload.sub)
-        .catch((err) => {
-          logger.error('리프레쉬 토큰 사용자 블랙리스트 확인 중 오류 발생:', err);
-          return null;
-        });
+      const userRevokedAt = await this.useAuthStore('사용자 무효화 정보 조회', () =>
+        this.redisBlacklist.getUserAndRevokedAt(payload.sub)
+      );
 
       if (userRevokedAt && userRevokedAt >= payload.iat!) {
         await this.revokeAllRefreshTokens(payload.sub);
@@ -123,11 +128,7 @@ export class TokenService implements ITokenService {
     const payload = await this.verifyRefreshToken(refreshToken);
     const newTokenPair = await this.generateTokenPair(payload.sub);
 
-    try {
-      await this.revokeRefreshToken(refreshToken);
-    } catch (err) {
-      logger.error('기존 Refresh Token 무효화 실패', err);
-    }
+    await this.revokeRefreshToken(refreshToken);
 
     return newTokenPair;
   }
@@ -145,17 +146,13 @@ export class TokenService implements ITokenService {
     }
 
     // 이미 블랙리스트에 등록된 토큰은 verifyRefreshToken에서 처리
-    await this.redisBlacklist.addToBlacklist(tokenId, expiresIn, now.toString()).catch((err) => {
-      logger.error('리프레쉬 토큰 블랙리스트 추가 중 오류 발생:', err);
-      return false;
-    });
+    await this.useAuthStore('토큰 블랙리스트 기록', () =>
+      this.redisBlacklist.addToBlacklist(tokenId, expiresIn, now.toString())
+    );
 
-    await this.redisBlacklist
-      .recordUserAndRevokedAt(sub, expiresIn, now.toString())
-      .catch((err) => {
-        logger.error('사용자 무효화 시간 기록 중 오류 발생:', err);
-        return false;
-      });
+    await this.useAuthStore('사용자 토큰 무효화 기록', () =>
+      this.redisBlacklist.recordUserAndRevokedAt(sub, expiresIn, now.toString())
+    );
 
     return true;
   }
@@ -164,12 +161,13 @@ export class TokenService implements ITokenService {
     // 초 단위 통일
     const now = Math.floor(Date.now() / 1000);
 
-    await this.redisBlacklist
-      .recordUserAndRevokedAt(userUuid, toSeconds(REFRESH_TOKEN_EXPIRES_IN), now.toString())
-      .catch((err) => {
-        logger.error('전체 리프레쉬 토큰 무효화 중 오류 발생:', err);
-        return false;
-      });
+    await this.useAuthStore('사용자 토큰 무효화 기록', () =>
+      this.redisBlacklist.recordUserAndRevokedAt(
+        userUuid,
+        toSeconds(REFRESH_TOKEN_EXPIRES_IN),
+        now.toString()
+      )
+    );
 
     return true;
   }

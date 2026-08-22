@@ -63,6 +63,11 @@ export const Errors = {
 
   BadGateway: (apiType: string, message = `${apiType} API 응답이 올바르지 않습니다.`) =>
     new AppError(message, 502, { errorCode: ErrorCode.EXTERNAL_API_ERROR }),
+
+  ServiceUnavailable: (message = '인증 저장소를 일시적으로 사용할 수 없습니다.') =>
+    new AppError(message, HttpStatus.SERVICE_UNAVAILABLE, {
+      errorCode: ErrorCode.AUTH_SERVICE_UNAVAILABLE,
+    }),
 };
 
 export { AppError } from './AppError';

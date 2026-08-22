@@ -10,9 +10,7 @@ export class RedisBlacklistRepository implements IRedisBlacklistRepository {
   async isOnBlacklist(tokenId: string): Promise<number | null> {
     const key = `blacklist:${tokenId}`;
 
-    const result = await this.redis.get(key).catch((err) => {
-      logger.error('Redis 블랙리스트 조회 중 오류 발생:', err);
-    });
+    const result = await this.redis.get(key);
 
     if (!result) return null;
     return parseInt(result, 10);
@@ -21,9 +19,7 @@ export class RedisBlacklistRepository implements IRedisBlacklistRepository {
   async addToBlacklist(tokenId: string, expiresIn: number, revokedAt: string): Promise<void> {
     const key = `blacklist:${tokenId}`;
 
-    await this.redis.setEx(key, expiresIn, revokedAt).catch((error) => {
-      logger.error('Redis 블랙리스트 추가 중 오류 발생:', error);
-    });
+    await this.redis.setEx(key, expiresIn, revokedAt);
   }
 
   async recordUserAndRevokedAt(
@@ -33,17 +29,13 @@ export class RedisBlacklistRepository implements IRedisBlacklistRepository {
   ): Promise<void> {
     const key = `user_revoked_at:${userId}`;
 
-    await this.redis.setEx(key, expiresIn, revokedAt).catch((error) => {
-      logger.error('Redis 사용자 무효화 시간 기록 중 오류 발생:', error);
-    });
+    await this.redis.setEx(key, expiresIn, revokedAt);
   }
 
   async getUserAndRevokedAt(userId: string): Promise<number | null> {
     const key = `user_revoked_at:${userId}`;
 
-    const result = await this.redis.get(key).catch((err) => {
-      logger.error('Redis 사용자 무효화 시간 조회 중 오류 발생:', err);
-    });
+    const result = await this.redis.get(key);
 
     if (!result) return null;
     return parseInt(result, 10);

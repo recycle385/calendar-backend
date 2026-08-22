@@ -75,7 +75,7 @@ const makeExpiredRefreshTokenPayload = (
 // 테스트 스위트
 // ========================================================================================
 
-describe('Redis Fail-open 하이브리드 전략 테스트', () => {
+describe('Redis Fail-closed 인증 전략 테스트', () => {
   let tokenService: TokenService;
   const mockToken = 'mock-refresh-token';
 
@@ -157,11 +157,11 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
   });
 
   // ========================================================================================
-  // 섹션 2: Redis 장애 - Fail-open 동작 (JWT 단독 검증)
+  // 섹션 2: Redis 장애 - Fail-closed 동작
   // ========================================================================================
 
-  describe('섹션 2: Redis 장애 - Fail-open (JWT 단독 검증 모드)', () => {
-    it('[Fail-open] Redis isOnBlacklist 장애 + 유효한 JWT -> 검증 성공 (JWT만 검증)', async () => {
+  describe('섹션 2: Redis 장애 - 인증 차단', () => {
+    it('[Fail-closed] 토큰 블랙리스트를 확인할 수 없으면 검증을 거부한다', async () => {
       const payload = makeValidRefreshTokenPayload();
       (jwt.verifyRefreshTokenSignature as jest.Mock).mockReturnValue(payload);
 
@@ -169,17 +169,14 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
       mockRedisBlacklistRepository.isOnBlacklist.mockRejectedValue(
         new Error('Redis connection timeout')
       );
-      mockRedisBlacklistRepository.getUserAndRevokedAt.mockResolvedValue(null); // 이 부분은 호출되지 않아야 함
-
-      // ✅ JWT 검증만으로 성공 (Redis 오류 무시)
-      const result = await tokenService.verifyRefreshToken(mockToken);
-
-      expect(result).toEqual(payload);
+      await expect(tokenService.verifyRefreshToken(mockToken)).rejects.toThrow(
+        '인증 저장소를 일시적으로 사용할 수 없습니다'
+      );
       expect(mockRedisBlacklistRepository.isOnBlacklist).toHaveBeenCalledWith(payload.tokenId);
-      // Redis 장애 시에는 JWT 만으로 검증하므로, getUserAndRevokedAt는 호출되지 않음
+      expect(mockRedisBlacklistRepository.getUserAndRevokedAt).not.toHaveBeenCalled();
     });
 
-    it('[Fail-open] Redis getUserAndRevokedAt 장애 + 유효한 JWT -> 검증 성공 (JWT만 검증)', async () => {
+    it('[Fail-closed] 사용자 무효화 정보를 확인할 수 없으면 검증을 거부한다', async () => {
       const payload = makeValidRefreshTokenPayload({
         iat: Math.floor(Date.now() / 1000) - 3600, // iat 필수 (getUserAndRevokedAt 호출 조건)
       });
@@ -191,15 +188,14 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
         new Error('Redis connection refused')
       );
 
-      // ✅ JWT 검증만으로 성공 (Redis 오류 무시)
-      const result = await tokenService.verifyRefreshToken(mockToken);
-
-      expect(result).toEqual(payload);
+      await expect(tokenService.verifyRefreshToken(mockToken)).rejects.toThrow(
+        '인증 저장소를 일시적으로 사용할 수 없습니다'
+      );
       expect(mockRedisBlacklistRepository.isOnBlacklist).toHaveBeenCalled();
       expect(mockRedisBlacklistRepository.getUserAndRevokedAt).toHaveBeenCalled();
     });
 
-    it('[Fail-open] 양쪽 Redis 모두 장애 + 유효한 JWT -> 검증 성공 (JWT만 검증)', async () => {
+    it('[Fail-closed] Redis 전체 장애 중에는 JWT 서명만으로 갱신하지 않는다', async () => {
       const payload = makeValidRefreshTokenPayload({
         iat: Math.floor(Date.now() / 1000) - 3600,
       });
@@ -211,11 +207,10 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
         new Error('Redis unavailable')
       );
 
-      // ✅ JWT 검증만으로 성공
-      const result = await tokenService.verifyRefreshToken(mockToken);
-
-      expect(result).toEqual(payload);
-      // Redis 장애에도 불구하고 서비스 계속 (Fail-open)
+      await expect(tokenService.verifyRefreshToken(mockToken)).rejects.toThrow(
+        '인증 저장소를 일시적으로 사용할 수 없습니다'
+      );
+      expect(mockRedisBlacklistRepository.getUserAndRevokedAt).not.toHaveBeenCalled();
     });
   });
 
@@ -264,11 +259,11 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
   });
 
   // ========================================================================================
-  // 섹션 4: Token Revoke 시 Fail-open
+  // 섹션 4: Token Revoke 시 Fail-closed
   // ========================================================================================
 
   describe('섹션 4: Token Revoke 시 Redis 장애 처리', () => {
-    it('[Fail-open] revokeRefreshToken 중 addToBlacklist 실패 -> graceful 처리', async () => {
+    it('[Fail-closed] revokeRefreshToken 중 기록 실패를 성공으로 보고하지 않는다', async () => {
       const payload = makeValidRefreshTokenPayload();
       (jwt.verifyRefreshTokenForRevoke as jest.Mock).mockReturnValue(payload);
 
@@ -280,15 +275,14 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
         new Error('Redis write failed')
       );
 
-      // ✅ Redis 오류에도 불구하고 로그만 하고 계속 진행 (Fail-open)
-      const result = await tokenService.revokeRefreshToken(mockToken);
-
-      // 전체 작업이 실패해도 false를 반환하고 진행
-      expect(result).toBeDefined();
+      await expect(tokenService.revokeRefreshToken(mockToken)).rejects.toThrow(
+        '인증 저장소를 일시적으로 사용할 수 없습니다'
+      );
       expect(mockRedisBlacklistRepository.addToBlacklist).toHaveBeenCalled();
+      expect(mockRedisBlacklistRepository.recordUserAndRevokedAt).not.toHaveBeenCalled();
     });
 
-    it('[Fail-open] revokeAllRefreshTokens 중 Redis 장애 -> graceful 처리', async () => {
+    it('[Fail-closed] revokeAllRefreshTokens 기록 실패를 성공으로 보고하지 않는다', async () => {
       const userUuid = 'user-uuid-123';
 
       // Redis 장애
@@ -296,10 +290,9 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
         new Error('Redis unavailable')
       );
 
-      // ✅ Redis 오류에도 불구하고 계속 진행
-      const result = await tokenService.revokeAllRefreshTokens(userUuid);
-
-      expect(result).toBeDefined();
+      await expect(tokenService.revokeAllRefreshTokens(userUuid)).rejects.toThrow(
+        '인증 저장소를 일시적으로 사용할 수 없습니다'
+      );
       expect(mockRedisBlacklistRepository.recordUserAndRevokedAt).toHaveBeenCalled();
     });
   });
@@ -320,8 +313,9 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
       // 1️⃣ 첫 번째: Redis 장애
       mockRedisBlacklistRepository.isOnBlacklist.mockRejectedValueOnce(new Error('Redis timeout'));
 
-      const result1 = await tokenService.verifyRefreshToken(mockToken);
-      expect(result1).toEqual(payload); // JWT만으로 검증 통과
+      await expect(tokenService.verifyRefreshToken(mockToken)).rejects.toThrow(
+        '인증 저장소를 일시적으로 사용할 수 없습니다'
+      );
 
       // 2️⃣ 두 번째: Redis 복구됨
       mockRedisBlacklistRepository.isOnBlacklist.mockResolvedValueOnce(null); // Redis 정상
@@ -337,7 +331,7 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
       await expect(tokenService.verifyRefreshToken(mockToken)).rejects.toThrow();
     });
 
-    it('[시나리오] 부분적 Redis 장애 -> 사용 가능한 기능만 사용', async () => {
+    it('[시나리오] 부분적 Redis 장애도 인증을 차단한다', async () => {
       const payload = makeValidRefreshTokenPayload({
         iat: Math.floor(Date.now() / 1000) - 3600,
       });
@@ -349,23 +343,22 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
         new Error('Redis partial failure')
       );
 
-      // ✅ 부분적 장애도 Fail-open으로 처리
-      const result = await tokenService.verifyRefreshToken(mockToken);
-      expect(result).toEqual(payload);
+      await expect(tokenService.verifyRefreshToken(mockToken)).rejects.toThrow(
+        '인증 저장소를 일시적으로 사용할 수 없습니다'
+      );
 
       // 첫 번째 Redis 작업은 성공했으므로 호출됨
       expect(mockRedisBlacklistRepository.isOnBlacklist).toHaveBeenCalled();
-      // 두 번째 Redis 작업은 실패했지만 계속 진행
       expect(mockRedisBlacklistRepository.getUserAndRevokedAt).toHaveBeenCalled();
     });
   });
 
   // ========================================================================================
-  // 섹션 6: 보안 고려사항 - Fail-open의 한계
+  // 섹션 6: 보안 고려사항 - 장애 중 우회 방지
   // ========================================================================================
 
-  describe('섹션 6: Fail-open 전략의 보안 영향도 분석', () => {
-    it('[보안] Fail-open 중: 블랙리스트된 토큰도 허용됨 (알려진 제약)', async () => {
+  describe('섹션 6: Redis 장애 중 토큰 재사용 차단', () => {
+    it('[보안] 블랙리스트 상태를 알 수 없으면 토큰을 허용하지 않는다', async () => {
       const payload = makeValidRefreshTokenPayload({
         iat: Math.floor(Date.now() / 1000) - 3600,
       });
@@ -374,16 +367,12 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
       // Redis 장애
       mockRedisBlacklistRepository.isOnBlacklist.mockRejectedValue(new Error('Redis unavailable'));
 
-      // ⚠️ Redis가 없으면 이미 로그아웃된 토큰도 허용됨
-      // 이것이 Fail-open의 트레이드오프
-      const result = await tokenService.verifyRefreshToken(mockToken);
-      expect(result).toEqual(payload);
-
-      // 하지만 모니터링과 로깅이 중요
-      // TokenService에서 Redis 오류를 logger.error()로 기록해야 함
+      await expect(tokenService.verifyRefreshToken(mockToken)).rejects.toThrow(
+        '인증 저장소를 일시적으로 사용할 수 없습니다'
+      );
     });
 
-    it('[보안] 사용자 완전 차단도 Fail-open 중에는 우회 가능', async () => {
+    it('[보안] 사용자 차단 상태를 확인할 수 없을 때도 인증을 거부한다', async () => {
       const payload = makeValidRefreshTokenPayload({
         iat: Math.floor(Date.now() / 1000) - 3600,
       });
@@ -393,11 +382,9 @@ describe('Redis Fail-open 하이브리드 전략 테스트', () => {
       mockRedisBlacklistRepository.isOnBlacklist.mockRejectedValue(new Error('Redis down'));
       mockRedisBlacklistRepository.getUserAndRevokedAt.mockRejectedValue(new Error('Redis down'));
 
-      // ⚠️ 사용자가 차단되었더라도 Redis 없으면 우회됨
-      const result = await tokenService.verifyRefreshToken(mockToken);
-      expect(result).toEqual(payload);
-
-      // 권장: Redis 복구 후 영향받은 사용자에 대한 감사 로그 검토
+      await expect(tokenService.verifyRefreshToken(mockToken)).rejects.toThrow(
+        '인증 저장소를 일시적으로 사용할 수 없습니다'
+      );
     });
   });
 });
