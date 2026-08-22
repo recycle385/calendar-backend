@@ -134,6 +134,10 @@ export const authSchemas = {
       .trim()
       .required()
       .messages({ 'any.required': '인증 정보가 만료되었거나 올바르지 않은 접근입니다.' }),
+    state: Joi.string()
+      .trim()
+      .required()
+      .messages({ 'any.required': 'OAuth state가 누락되었습니다.' }),
   }),
 
   signupRequest: Joi.object({

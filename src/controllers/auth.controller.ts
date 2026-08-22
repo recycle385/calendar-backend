@@ -1,6 +1,8 @@
+import { randomBytes, timingSafeEqual } from 'crypto';
 import { RequestHandler, Response } from 'express';
 
 import { env } from '../config/env';
+import { API_PREFIX, AUTH_ROUTES } from '../constants/routes.constants';
 import { REFRESH_TOKEN_EXPIRES_IN } from '../constants/token.constants';
 import { User } from '../models';
 import { OAuthCallbackResponse, SafeUser } from '../types/auth.types';
@@ -8,6 +10,23 @@ import { TokenPair } from '../types/token.types';
 import { IAuthService } from '../types/user.types';
 import { Errors } from '../utils/errors';
 import { toSeconds } from '../utils/timeConverter';
+
+const OAUTH_STATE_COOKIE = 'oauth_state';
+const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
+const OAUTH_CALLBACK_PATH = `${API_PREFIX}${AUTH_ROUTES.BASE}${AUTH_ROUTES.GOOGLE_CALLBACK}`;
+
+function isMatchingOAuthState(expected: unknown, actual: unknown): boolean {
+  if (typeof expected !== 'string' || typeof actual !== 'string') {
+    return false;
+  }
+
+  const expectedBuffer = Buffer.from(expected);
+  const actualBuffer = Buffer.from(actual);
+
+  return (
+    expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer)
+  );
+}
 
 export class AuthController {
   constructor(private authService: IAuthService) {}
@@ -17,18 +36,47 @@ export class AuthController {
     secure: env.NODE_ENV === 'production',
   };
 
+  private oauthStateCookieOptions = {
+    ...this.cookieOptions,
+    sameSite: 'lax' as const,
+    path: OAUTH_CALLBACK_PATH,
+  };
+
   private clearRefreshTokenCookie(res: Response) {
     res.clearCookie('jwt', this.cookieOptions);
   }
 
+  private clearOAuthStateCookie(res: Response) {
+    res.clearCookie(OAUTH_STATE_COOKIE, this.oauthStateCookieOptions);
+  }
+
   public redirectToGoogle: RequestHandler = async (req, res) => {
-    const googleLoginUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${env.CLIENT_URL}/auth/callback&response_type=code&scope=email profile`;
-    return res.redirect(googleLoginUrl);
+    const state = randomBytes(32).toString('hex');
+    res.cookie(OAUTH_STATE_COOKIE, state, {
+      ...this.oauthStateCookieOptions,
+      maxAge: OAUTH_STATE_MAX_AGE_MS,
+    });
+
+    const googleLoginUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    googleLoginUrl.searchParams.set('client_id', env.GOOGLE_CLIENT_ID);
+    googleLoginUrl.searchParams.set('redirect_uri', `${env.CLIENT_URL}/auth/callback`);
+    googleLoginUrl.searchParams.set('response_type', 'code');
+    googleLoginUrl.searchParams.set('scope', 'email profile');
+    googleLoginUrl.searchParams.set('state', state);
+
+    return res.redirect(googleLoginUrl.toString());
   };
 
   // 구글 OAuth 콜백 처리 (신규/기존 사용자 구분, 기존 사용자 바로 로그인)
   public handleGoogleCallback: RequestHandler = async (req, res) => {
-    const { code } = req.query; // 구글에서 보내준 인증 코드
+    const { code, state } = req.query; // 구글에서 보내준 인증 정보
+    const storedState = req.cookies?.[OAUTH_STATE_COOKIE];
+
+    this.clearOAuthStateCookie(res);
+
+    if (!isMatchingOAuthState(storedState, state)) {
+      throw Errors.Unauthorized('유효하지 않은 OAuth state입니다');
+    }
 
     const oAuthCallbackResponse: OAuthCallbackResponse =
       await this.authService.handleGoogleCallback(code as string);

@@ -38,6 +38,12 @@ export const createAuthRouter = (controller: AuthController): Router => {
    *         schema:
    *           type: string
    *         description: "구글에서 발급한 인증 코드"
+   *       - in: query
+   *         name: state
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: "로그인 요청 위조 방지를 위한 일회성 상태값"
    *     responses:
    *       200:
    *         description: "인증 처리 성공"
