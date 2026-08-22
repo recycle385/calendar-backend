@@ -3,20 +3,11 @@ import http from 'http';
 import { connectDatabaseWithRetry } from './config/database';
 import { env } from './config/env';
 import { ensureParticipantCalendarUserUniqueKey } from './config/participantMigrations';
-import { connectRedis } from './config/redis';
+import { connectRedis, redisClient } from './config/redis';
 import { cronService } from './containers/cron.container';
 import { logger } from './middlewares/logger';
 import { initializeSocketIO } from './sockets';
 import { setupGracefulShutdown } from './utils/shutdownHandler';
-
-process.on('uncaughtException', (err) => {
-  logger.error('UNCAUGHT EXCEPTION:', { err });
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason) => {
-  logger.error('UNHANDLED REJECTION:', { reason });
-});
 
 async function startServer() {
   try {
@@ -46,7 +37,7 @@ async function startServer() {
 ║  🚀 서버가 실행 중 입니다!    ║
 ║  📡 Port: ${env.PORT}                ║
 ║  🌍 Env: ${env.NODE_ENV}          ║
-║  🔌 Redis: 연결됨             ║
+║  🔌 Redis: ${redisClient.isReady ? '연결됨' : '연결 안 됨'}             ║
 ║  💾 Database: 연결됨          ║
 ╚═══════════════════════════════╝
       `);

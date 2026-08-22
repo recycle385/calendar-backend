@@ -33,13 +33,6 @@ export const logger = winston.createLogger({
       maxFiles: 5,
     }),
   ],
-  // 예외 처리
-  exceptionHandlers: [
-    new winston.transports.File({ filename: path.join(logDir, 'exceptions.log') }),
-  ],
-  rejectionHandlers: [
-    new winston.transports.File({ filename: path.join(logDir, 'rejections.log') }),
-  ],
 });
 
 // 개발 환경에서는 콘솔 출력
