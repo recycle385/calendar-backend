@@ -18,7 +18,7 @@ export async function getSpcdeInfoUrl(
 
   try {
     const { data } = await axios.get(
-      `http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/${dateKind}`,
+      `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/${dateKind}`,
       {
         params: {
           solYear: year,

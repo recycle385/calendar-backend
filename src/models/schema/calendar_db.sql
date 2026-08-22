@@ -57,6 +57,14 @@ CREATE TABLE date_info (
     UNIQUE KEY unique_date_seq (location_date, seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE date_info_sync_status (
+    year CHAR(4) NOT NULL,
+    date_kind ENUM('01', '02', '03', '04', '05') NOT NULL,
+    last_synced_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (year, date_kind)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 4. 참가자 테이블 (닉네임 + 비밀번호)
 CREATE TABLE participants (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

@@ -28,7 +28,7 @@ export class CronService {
     cron.schedule('0 4 1 12 *', async () => {
       logger.info('[Cron] 매년 12월 1일 정기 업데이트 시작');
 
-      await this.updateDateInfo();
+      await this.updateDateInfo(false);
 
       await this.deleteExpiredDateInfo();
 
@@ -110,21 +110,31 @@ export class CronService {
     }
   }
 
-  private async updateDateInfo() {
+  private async updateDateInfo(onlyMissing: boolean) {
     const currentYear = new Date().getFullYear();
 
     logger.info(`[Cron] ${currentYear}년 기준 공휴일 정보 업데이트 시작`);
 
     for (let year = currentYear - 3; year <= currentYear + 2; year++) {
       logger.info(`[Cron] ${year}년 업데이트 시작`);
+      const syncedDateKinds = onlyMissing
+        ? new Set(
+            await this.dateInfoRepository.findSyncedPublicApiDateKindsByYear(year.toString())
+          )
+        : new Set();
 
       for (let dateKindCodeNum = 1; dateKindCodeNum <= dateKindMap.size; dateKindCodeNum++) {
         const dateKind = dateKindCodeToDateKind(dateKindCodeNum);
         const dateKindCode = dateKindMap.get(dateKind);
 
+        if (syncedDateKinds.has(dateKind)) {
+          continue;
+        }
+
         try {
           const dateInfoList: SafeDateInfo[] = await getSpcdeInfoUrl(year, dateKind);
           await this.dateInfoRepository.insertDateInfos(dateInfoList);
+          await this.dateInfoRepository.markPublicApiDateKindSynced(year.toString(), dateKind);
           logger.info(`[Cron] ${year}년 ${dateKindCode} 업데이트 완료: ${dateInfoList.length}건`);
         } catch (err) {
           logger.error(`[Cron] ${year}년 ${dateKindCode} 업데이트 실패`, err);
@@ -146,6 +156,7 @@ export class CronService {
         expirationYear.toString()
       );
 
+      await this.dateInfoRepository.deleteSyncStatusByYearBefore(expirationYear.toString());
       logger.info(`[Cron] ${expirationYear}년 date-info 삭제 완료: ${deletedCount}개`);
 
       const remainingData = await this.dateInfoRepository.findByYearBefore(

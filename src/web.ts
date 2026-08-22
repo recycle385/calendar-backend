@@ -2,6 +2,7 @@ import http from 'http';
 
 import { connectDatabaseWithRetry } from './config/database';
 import { env } from './config/env';
+import { ensureHolidaySyncStatusTable } from './config/holidaySyncMigrations';
 import { ensureParticipantCalendarUserUniqueKey } from './config/participantMigrations';
 import { connectRedis, redisClient } from './config/redis';
 import { cronService } from './containers/cron.container';
@@ -22,6 +23,7 @@ async function startServer() {
 
     logger.info('db 연결 시도');
     await connectDatabaseWithRetry();
+    await ensureHolidaySyncStatusTable();
     await ensureParticipantCalendarUserUniqueKey();
     logger.info('reids, db 연결성공');
 

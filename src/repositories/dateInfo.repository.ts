@@ -8,6 +8,16 @@ import { Errors } from '../utils/errors';
 
 export interface IDateInfoRepository {
   insertDateInfos(dateInfoList: SafeDateInfo[], connection?: PoolConnection): Promise<number>;
+  findSyncedPublicApiDateKindsByYear(
+    year: string,
+    connection?: PoolConnection
+  ): Promise<DateKind[]>;
+  markPublicApiDateKindSynced(
+    year: string,
+    dateKind: DateKind,
+    connection?: PoolConnection
+  ): Promise<void>;
+  deleteSyncStatusByYearBefore(year: string, connection?: PoolConnection): Promise<number>;
   findByIds(ids: number[], connection?: PoolConnection): Promise<DateInfo[]>;
   findByYears(years: string[], connection?: PoolConnection): Promise<DateInfo[]>;
   findByYearBefore(year: string, connection?: PoolConnection): Promise<DateInfo[]>;
@@ -35,6 +45,48 @@ export interface IDateInfoRepository {
 
 export class DateInfoRepository implements IDateInfoRepository {
   constructor(private pool = dbpool) {}
+
+  async findSyncedPublicApiDateKindsByYear(
+    year: string,
+    connection?: PoolConnection
+  ): Promise<DateKind[]> {
+    const poolToUse = connection || this.pool;
+
+    const [rows] = await poolToUse.execute<RowDataPacket[]>(
+      'SELECT date_kind FROM date_info_sync_status WHERE year = ?',
+      [year]
+    );
+
+    return rows.map((row) => row.date_kind as DateKind);
+  }
+
+  async markPublicApiDateKindSynced(
+    year: string,
+    dateKind: DateKind,
+    connection?: PoolConnection
+  ): Promise<void> {
+    const poolToUse = connection || this.pool;
+
+    await poolToUse.execute(
+      `INSERT INTO date_info_sync_status (year, date_kind)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE last_synced_at = CURRENT_TIMESTAMP`,
+      [year, dateKind]
+    );
+  }
+
+  async deleteSyncStatusByYearBefore(
+    year: string,
+    connection?: PoolConnection
+  ): Promise<number> {
+    const poolToUse = connection || this.pool;
+    const [result] = await poolToUse.execute<ResultSetHeader>(
+      'DELETE FROM date_info_sync_status WHERE year < ?',
+      [year]
+    );
+
+    return result.affectedRows;
+  }
 
   async insertDateInfos(
     dateInfoList: SafeDateInfo[],
