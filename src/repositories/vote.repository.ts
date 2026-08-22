@@ -65,7 +65,7 @@ export class VoteRepository implements IVoteRepository {
   }
 
   /**
-   * 복수 날짜에 대한 투표 일괄 처리
+   * 참가자의 기존 투표를 현재 선택 목록으로 교체
    */
   async upsertVotes(
     participantId: number,
@@ -73,7 +73,38 @@ export class VoteRepository implements IVoteRepository {
     voteType: VoteType,
     connection?: PoolConnection
   ): Promise<number> {
-    const poolToUse = connection || this.pool;
+    if (connection) {
+      return this.replaceVotes(connection, participantId, dateOptionIds, voteType);
+    }
+
+    const transactionConnection = await this.pool.getConnection();
+
+    try {
+      await transactionConnection.beginTransaction();
+      const affectedRows = await this.replaceVotes(
+        transactionConnection,
+        participantId,
+        dateOptionIds,
+        voteType
+      );
+      await transactionConnection.commit();
+      return affectedRows;
+    } catch (error) {
+      await transactionConnection.rollback();
+      throw error;
+    } finally {
+      transactionConnection.release();
+    }
+  }
+
+  private async replaceVotes(
+    connection: PoolConnection,
+    participantId: number,
+    dateOptionIds: number[],
+    voteType: VoteType
+  ): Promise<number> {
+    await this.deleteAllByParticipant(participantId, connection);
+
     if (dateOptionIds.length === 0) {
       return 0;
     }
@@ -81,7 +112,7 @@ export class VoteRepository implements IVoteRepository {
     const sortedIds = [...dateOptionIds].sort((a, b) => a - b);
     const values = sortedIds.map((dateOptionId) => [participantId, dateOptionId, voteType]);
 
-    const [result] = await poolToUse.query<ResultSetHeader>(
+    const [result] = await connection.query<ResultSetHeader>(
       `INSERT INTO votes (participant_id, date_option_id, vote_type)
        VALUES ?
        ON DUPLICATE KEY UPDATE 
