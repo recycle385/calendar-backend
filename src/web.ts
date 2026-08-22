@@ -1,6 +1,5 @@
 import http from 'http';
 
-import { app } from './app';
 import { connectDatabaseWithRetry } from './config/database';
 import { env } from './config/env';
 import { connectRedis } from './config/redis';
@@ -25,6 +24,9 @@ async function startServer() {
     logger.info('reids 연결 시도');
     await connectRedis();
     logger.info('redis 연결 성공');
+
+    // rate limiter가 Redis 연결 상태를 확인한 뒤 store를 선택하도록 app을 지연 로딩한다.
+    const { app } = await import('./app');
 
     logger.info('db 연결 시도');
     await connectDatabaseWithRetry();

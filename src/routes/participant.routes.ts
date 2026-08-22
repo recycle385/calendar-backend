@@ -1,8 +1,9 @@
 import { Router } from 'express';
 
+import { env } from '../config/env';
 import { PARTICIPANT_ROUTES } from '../constants/routes.constants';
 import { ParticipantController } from '../controllers/participant.controller';
-import { optionalAuth } from '../middlewares';
+import { authRateLimiter, optionalAuth } from '../middlewares';
 import { authenticateParticipant } from '../middlewares/auth';
 import { asyncHandler } from '../middlewares/errorHandler';
 import {
@@ -95,6 +96,7 @@ export const createParticipantRouter = (controller: ParticipantController): Rout
   router.post(
     PARTICIPANT_ROUTES.LOGIN,
     validateParams(slugParams),
+    ...(env.ENABLE_RATE_LIMIT ? [authRateLimiter] : []),
     validateBody(participantSchemas.loginRequest),
     optionalAuth,
     asyncHandler(controller.loginParticipant)
