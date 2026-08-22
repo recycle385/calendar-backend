@@ -72,6 +72,7 @@ CREATE TABLE participants (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
     UNIQUE KEY unique_calendar_nickname (calendar_id, nickname),
+    UNIQUE KEY unique_calendar_user (calendar_id, user_id),
     INDEX idx_calendar_id (calendar_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

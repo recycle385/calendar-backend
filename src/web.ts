@@ -2,6 +2,7 @@ import http from 'http';
 
 import { connectDatabaseWithRetry } from './config/database';
 import { env } from './config/env';
+import { ensureParticipantCalendarUserUniqueKey } from './config/participantMigrations';
 import { connectRedis } from './config/redis';
 import { cronService } from './containers/cron.container';
 import { logger } from './middlewares/logger';
@@ -30,6 +31,7 @@ async function startServer() {
 
     logger.info('db 연결 시도');
     await connectDatabaseWithRetry();
+    await ensureParticipantCalendarUserUniqueKey();
     logger.info('reids, db 연결성공');
 
     const server = http.createServer(app);

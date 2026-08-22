@@ -15,6 +15,11 @@ export interface IParticipantRepository {
   findById(id: number, connection?: PoolConnection): Promise<Participant | null>;
   findByUuid(uuid: string, connection?: PoolConnection): Promise<Participant | null>;
   existsByUuid(uuid: string, connection?: PoolConnection): Promise<boolean>;
+  existsByCalendarAndUser(
+    calendarId: number,
+    userId: number,
+    connection?: PoolConnection
+  ): Promise<boolean>;
   getIdUsingUuid(uuid: string, connection?: PoolConnection): Promise<number>;
   getUuidUsingId(id: number, connection?: PoolConnection): Promise<string>;
   getParticipantUuidByUserIdAndCalendarId(
@@ -134,6 +139,20 @@ export class ParticipantRepository implements IParticipantRepository {
     const [rows] = await poolToUse.execute<RowDataPacket[]>(
       'SELECT 1 FROM participants WHERE participant_uuid = ? LIMIT 1',
       [uuid]
+    );
+
+    return rows.length > 0;
+  }
+
+  async existsByCalendarAndUser(
+    calendarId: number,
+    userId: number,
+    connection?: PoolConnection
+  ): Promise<boolean> {
+    const poolToUse = connection || this.pool;
+    const [rows] = await poolToUse.execute<RowDataPacket[]>(
+      'SELECT 1 FROM participants WHERE calendar_id = ? AND user_id = ? LIMIT 1',
+      [calendarId, userId]
     );
 
     return rows.length > 0;

@@ -58,6 +58,21 @@ export class ParticipantService implements IParticipantService {
       throw Errors.BadRequest('닉네임은 20자 이하여야 합니다');
     }
 
+    if ('userId' in input) {
+      if (!input.userId) {
+        throw Errors.BadRequest('유효하지 않은 User ID입니다.');
+      }
+
+      const alreadyJoined = await this.participantRepository.existsByCalendarAndUser(
+        input.calendarId,
+        input.userId
+      );
+
+      if (alreadyJoined) {
+        throw Errors.Conflict('이미 이 캘린더에 참여한 회원입니다');
+      }
+    }
+
     // 닉네임 중복 체크
     const exists = await this.participantRepository.nicknameExists({
       calendar_id: input.calendarId,
@@ -74,16 +89,18 @@ export class ParticipantService implements IParticipantService {
     let createInput: CreateParticipantInput;
 
     if ('userId' in input) {
-      if (!input.userId) {
+      const userId = input.userId;
+      if (!userId) {
         throw Errors.BadRequest('유효하지 않은 User ID입니다.');
       }
+
       if (input.role === 'host') {
         createInput = {
           role: 'host',
           calendar_id: input.calendarId,
           participant_uuid: participantUuid,
           nickname: input.nickname.trim(),
-          user_id: input.userId,
+          user_id: userId,
           color_code: '#FF0000',
         };
       } else {
@@ -92,7 +109,7 @@ export class ParticipantService implements IParticipantService {
           calendar_id: input.calendarId,
           participant_uuid: participantUuid,
           nickname: input.nickname.trim(),
-          user_id: input.userId,
+          user_id: userId,
           color_code: '#FF0000',
         };
       }
