@@ -3,6 +3,7 @@ import { Server } from 'socket.io';
 
 import { env } from '../config/env';
 import { participantService, tokenService } from '../containers/service.container';
+import { logger } from '../middlewares/logger';
 import { CustomSocket } from '../types/socket.types';
 import { Errors } from '../utils/errors';
 import { CalendarSocketController } from './socket.controller';
@@ -42,12 +43,12 @@ export const initializeSocketIO = (httpServer: HttpServer) => {
   });
 
   io.on('connection', (socket: CustomSocket) => {
-    console.log(`소켓이 연결됐습니다. 방: ${socket.id} (유저: ${socket.data.sub})`);
+    logger.info(`소켓이 연결됐습니다. 방: ${socket.id} (유저: ${socket.data.sub})`);
 
     calendarSocketController.handleSocketEvent(socket);
 
     socket.on('disconnect', () => {
-      console.log(`소켓과의 연결이 해제됐습니다: ${socket.id}`);
+      logger.info(`소켓과의 연결이 해제됐습니다: ${socket.id}`);
     });
   });
 

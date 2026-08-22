@@ -1,14 +1,15 @@
+import { logger } from '../middlewares/logger';
 import { CustomSocket } from '../types/socket.types';
 
 export class CalendarSocketController {
   public handleSocketEvent(socket: CustomSocket) {
     socket.on('joinCalendarRoom', () => {
       // [디버깅] 이벤트 수신 확인용 로그 (필수!)
-      console.log(`[DEBUG] joinCalendarRoom 이벤트 수신: Socket ID ${socket.id}`);
+      logger.debug(`joinCalendarRoom 이벤트 수신: Socket ID ${socket.id}`);
       try {
         this.joinCalendarRoom(socket);
       } catch (err) {
-        console.error(`joinCalendarRoom 핸들러 에러: ${(err as Error).message}`);
+        logger.error('joinCalendarRoom 핸들러 에러', { error: err });
         socket.emit('error', { message: 'Internal Server Error during Join' });
       }
     });
@@ -16,25 +17,25 @@ export class CalendarSocketController {
     socket.on('leaveCalendarRoom', () => {
       try {
         this.handleLeave(socket);
-        console.log(
+        logger.info(
           `유저 ${socket.data.sub}님이 캘린더 방 ${socket.data.calendarId}에서 나갔습니다.`
         );
       } catch (err) {
-        console.error(`leaveCalendarRoom 에러: ${(err as Error).message}`);
+        logger.error('leaveCalendarRoom 에러', { error: err });
       }
     });
 
     socket.on('disconnect', () => {
       try {
         this.handleLeave(socket);
-        console.log(`유저 ${socket.data.sub}님이 연결을 종료했습니다.`);
+        logger.info(`유저 ${socket.data.sub}님이 연결을 종료했습니다.`);
       } catch (err) {
-        console.error(`disconnect 에러: ${(err as Error).message}`);
+        logger.error('disconnect 에러', { error: err });
       }
     });
 
     socket.on('error', (err: Error) => {
-      console.error(`소켓 에러 발생: ${err.message}`);
+      logger.error('소켓 에러 발생', { error: err });
     });
   }
 
@@ -51,23 +52,23 @@ export class CalendarSocketController {
 
       // 🚨 [안전장치 2] ID 누락 시 즉시 에러 처리
       if (!calendarId) {
-        console.error(`[ERROR] 방 입장 실패: Calendar ID가 없습니다. User: ${sub}`);
+        logger.error(`방 입장 실패: Calendar ID가 없습니다. User: ${sub}`);
         // 클라이언트(테스트)에게 에러를 알려줘서 타임아웃 대신 실패하게 함
         socket.emit('error', { message: 'Calendar ID is missing in socket data' });
         return;
       }
 
       // [디버깅] 실제 입장 시도 로그
-      console.log(`[DEBUG] 입장 시도 - ID: ${sub}, Room: ${calendarId}`);
+      logger.debug(`입장 시도 - ID: ${sub}, Room: ${calendarId}`);
 
       if (socket.rooms.has(calendarId)) {
-        console.log(`[DEBUG] 이미 방에 존재함: ${calendarId}`);
+        logger.debug(`이미 방에 존재함: ${calendarId}`);
         return;
       }
 
       await socket.join(calendarId);
 
-      console.log(`아이디: ${sub}가 캘린더 방: ${calendarId} 입장 성공`);
+      logger.info(`아이디: ${sub}가 캘린더 방: ${calendarId} 입장 성공`);
 
       socket.to(calendarId).emit('userOnline', { sub, nickname, role });
 
@@ -83,7 +84,7 @@ export class CalendarSocketController {
 
       socket.emit('onlineUsers', onlineUsers);
     } catch (err) {
-      console.error(`joinCalendarRoom 내부 로직 에러: ${(err as Error).message}`);
+      logger.error('joinCalendarRoom 내부 로직 에러', { error: err });
       socket.emit('error', { message: 'Join Room Failed' });
     }
   }
@@ -99,10 +100,10 @@ export class CalendarSocketController {
 
         socket.to(calendarId).emit('userOffline', { sub, nickname });
 
-        console.log(`아이디: ${sub}가 캘린더 방: ${calendarId} 퇴장`);
+        logger.info(`아이디: ${sub}가 캘린더 방: ${calendarId} 퇴장`);
       }
     } catch (err) {
-      console.error(`handleLeave 에러: ${(err as Error).message}`);
+      logger.error('handleLeave 에러', { error: err });
     }
   }
 }

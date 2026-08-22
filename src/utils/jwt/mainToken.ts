@@ -21,7 +21,7 @@ function toMainTokenPayload(decoded: unknown): MainTokenPayload {
   };
 }
 
-//방장용 Access Token 생성, 수명: 15분
+// 방장용 Access Token 생성, 기본 수명: 2시간
 export function generateMainToken(
   payload: Omit<MainTokenPayload, 'role'>,
   expiresIn: string = MAIN_TOKEN_EXPIRES_IN

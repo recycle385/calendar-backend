@@ -45,7 +45,7 @@ export async function connectRedis() {
   if (redisClient.isOpen) return;
   try {
     await redisClient.connect();
-    logger.info('redis 연결 성공:', REDIS_URL);
+    logger.info('redis 연결 성공');
   } catch (err) {
     logger.error('redis 연결실패:', err);
     return false;
