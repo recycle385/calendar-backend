@@ -1,19 +1,17 @@
 import { DateInfoRepository } from '../../../repositories/dateInfo.repository';
 
 describe('DateInfoRepository Unit Test', () => {
-  it('existsPublicApiByYear는 해당 연도 public-api 데이터 존재 여부를 반환해야 한다', async () => {
+  it('연도별로 동기화가 완료된 날짜 종류를 반환한다', async () => {
     const mockPool = {
-      execute: jest.fn().mockResolvedValue([[{ 1: 1 }]]),
+      execute: jest.fn().mockResolvedValue([[{ date_kind: '01' }, { date_kind: '03' }]]),
     };
     const repository = new DateInfoRepository(mockPool as any);
 
-    const result = await repository.existsPublicApiByYear('2026');
+    const result = await repository.findSyncedPublicApiDateKindsByYear('2026');
 
-    expect(result).toBe(true);
+    expect(result).toEqual(['01', '03']);
     expect(mockPool.execute).toHaveBeenCalledWith(
-      expect.stringContaining(
-        `SELECT 1 FROM date_info WHERE year = ? AND data_source = 'public-api' LIMIT 1`
-      ),
+      expect.stringContaining('SELECT date_kind FROM date_info_sync_status WHERE year = ?'),
       ['2026']
     );
   });

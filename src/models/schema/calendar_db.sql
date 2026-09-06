@@ -54,7 +54,7 @@ CREATE TABLE date_info (
     data_source ENUM('public-api','custom') DEFAULT 'public-api' COMMENT '데이터 출처',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    UNIQUE KEY unique_date_kind_seq (location_date, date_kind, seq)
+    UNIQUE KEY unique_date_kind_seq_source (location_date, date_kind, seq, data_source)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE date_info_sync_status (

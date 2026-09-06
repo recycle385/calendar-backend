@@ -245,3 +245,7 @@ io("http://localhost:4000", {
 - 공통 에러 처리는 `src/middlewares/errorHandler.ts`와 `src/utils/errors`에서 관리합니다.
 - Redis는 토큰 블랙리스트, rate limit, Socket.IO 관련 기능에 사용됩니다.
 - `ENABLE_RATE_LIMIT=true`일 때 `/api/v1` 하위 API에 rate limiter가 적용됩니다.
+
+### 공휴일 데이터 출처 보존
+
+공휴일의 저장 키는 날짜·종류·순번·출처입니다. 같은 날짜와 순번의 `public-api`와 `custom` 항목은 별도로 보존하며, 재동기화는 같은 출처의 항목만 갱신합니다. 서버 시작 시 기존 유니크 키를 하나의 ALTER TABLE로 교체합니다. 이미 이전 동기화에서 덮어써진 데이터는 백업에서 복원해야 합니다. 과거 수동 마이그레이션 SQL을 최신 마이그레이션 이후에 다시 실행하지 마세요.

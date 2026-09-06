@@ -110,8 +110,7 @@ export class DateInfoRepository implements IDateInfoRepository {
        ON DUPLICATE KEY UPDATE
          year = VALUES(year),
          date_name = VALUES(date_name),
-         is_holiday = VALUES(is_holiday),
-         data_source = VALUES(data_source)`,
+          is_holiday = VALUES(is_holiday)`,
       [values]
     );
 
