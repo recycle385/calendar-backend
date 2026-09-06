@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 
 import { logger } from '../middlewares/logger';
-import { dateKindMap, SafeDateInfo, VALID_DATE_KINDS } from '../models/DateInfo';
+import { dateKindMap, SafeDateInfo } from '../models/DateInfo';
 import { ICalendarRepository } from '../repositories/calendar.repository';
 import { IDateInfoRepository } from '../repositories/dateInfo.repository';
 import { getIO } from '../sockets';
@@ -9,31 +9,29 @@ import { dateKindCodeToDateKind } from '../utils/dateKindCodeChanger';
 import { getSpcdeInfoUrl } from '../utils/Spcde.api';
 
 export class CronService {
+  private holidayUpdateInFlight?: Promise<void>;
   constructor(
     private calendarRepository: ICalendarRepository,
     private dateInfoRepository: IDateInfoRepository
   ) {}
 
   public start() {
-    cron.schedule('0 4 * * *', async () => {
-      logger.info('[Cron] 새벽 4시 정기 점검 시작');
+    cron.schedule(
+      '0 4 * * *',
+      async () => {
+        logger.info('[Cron] 새벽 4시 정기 점검 시작');
 
-      await this.deleteExpiredCalendars();
+        await this.deleteExpiredCalendars();
 
-      await this.closeEndedCalendars();
+        await this.closeEndedCalendars();
+        const now = new Date();
+        const fullUpdate = now.getUTCMonth() === 11 && now.getUTCDate() === 1;
+        await this.runHolidayUpdate(!fullUpdate);
 
-      logger.info('[Cron] 정기 점검 종료');
-    });
-
-    cron.schedule('0 4 1 12 *', async () => {
-      logger.info('[Cron] 매년 12월 1일 정기 업데이트 시작');
-
-      await this.updateDateInfo(false);
-
-      await this.deleteExpiredDateInfo();
-
-      logger.info('[Cron] 정기 업데이트 종료');
-    });
+        logger.info('[Cron] 정기 점검 종료');
+      },
+      { timezone: 'UTC' }
+    );
   }
 
   private async deleteExpiredCalendars() {
@@ -110,43 +108,30 @@ export class CronService {
     }
   }
 
-  public async runHolidayUpdate() {
-    const currentYear = new Date().getFullYear().toString();
-    const syncedDateKinds = await this.dateInfoRepository.findSyncedPublicApiDateKindsByYear(
-      currentYear
-    );
-    const missingDateKinds = VALID_DATE_KINDS.filter(
-      (dateKind) => !syncedDateKinds.includes(dateKind)
-    );
-
-    if (missingDateKinds.length === 0) {
-      logger.info(
-        `[Cron] 서버 시작 시 ${currentYear}년 모든 date-kind 동기화가 완료되어 업데이트 생략`
-      );
-      return;
+  public runHolidayUpdate(onlyMissing = true): Promise<void> {
+    if (this.holidayUpdateInFlight) {
+      // 연간 전체 갱신 요청은 진행 중인 누락 복구가 끝난 뒤 수행한다.
+      return onlyMissing
+        ? this.holidayUpdateInFlight
+        : this.holidayUpdateInFlight.then(() => this.runHolidayUpdate(false));
     }
-
-    logger.info(
-      `[Cron] 서버 시작 시 ${currentYear}년 미동기화 date-kind(${missingDateKinds.join(',')}) 업데이트 시작`
-    );
-
-    await this.updateDateInfo(true);
-    await this.deleteExpiredDateInfo();
-
-    logger.info('[Cron] 서버 시작 시 공휴일 정보 업데이트 종료');
+    this.holidayUpdateInFlight = this.updateDateInfo(onlyMissing)
+      .then(() => this.deleteExpiredDateInfo())
+      .finally(() => {
+        this.holidayUpdateInFlight = undefined;
+      });
+    return this.holidayUpdateInFlight;
   }
 
   private async updateDateInfo(onlyMissing: boolean) {
-    const currentYear = new Date().getFullYear();
+    const currentYear = new Date().getUTCFullYear();
 
     logger.info(`[Cron] ${currentYear}년 기준 공휴일 정보 업데이트 시작`);
 
     for (let year = currentYear - 3; year <= currentYear + 2; year++) {
       logger.info(`[Cron] ${year}년 업데이트 시작`);
       const syncedDateKinds = onlyMissing
-        ? new Set(
-            await this.dateInfoRepository.findSyncedPublicApiDateKindsByYear(year.toString())
-          )
+        ? new Set(await this.dateInfoRepository.findSyncedPublicApiDateKindsByYear(year.toString()))
         : new Set();
 
       for (let dateKindCodeNum = 1; dateKindCodeNum <= dateKindMap.size; dateKindCodeNum++) {
@@ -172,7 +157,7 @@ export class CronService {
   }
 
   private async deleteExpiredDateInfo() {
-    const currentYear = new Date().getFullYear();
+    const currentYear = new Date().getUTCFullYear();
     const expirationYear = currentYear - 3;
 
     try {
