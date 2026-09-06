@@ -44,6 +44,8 @@ describe('TokenService 테스트', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    mockRedisBlacklistRepository.isOnBlacklist.mockResolvedValue(null);
+    mockRedisBlacklistRepository.getUserAndRevokedAt.mockResolvedValue(null);
     mockRedisBlacklistRepository.addToBlacklist.mockResolvedValue(undefined);
     mockRedisBlacklistRepository.recordUserAndRevokedAt.mockResolvedValue(undefined);
     mockRedisSignupRepository.issueSignupToken.mockResolvedValue('signup-token');

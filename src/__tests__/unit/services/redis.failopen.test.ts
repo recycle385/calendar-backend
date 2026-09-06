@@ -89,6 +89,8 @@ describe('Redis Fail-closed 인증 전략 테스트', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    mockRedisBlacklistRepository.isOnBlacklist.mockResolvedValue(null);
+    mockRedisBlacklistRepository.getUserAndRevokedAt.mockResolvedValue(null);
     // 기본 Mock 설정
     mockRedisBlacklistRepository.addToBlacklist.mockResolvedValue(undefined);
     mockRedisBlacklistRepository.recordUserAndRevokedAt.mockResolvedValue(undefined);

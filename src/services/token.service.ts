@@ -99,6 +99,17 @@ export class TokenService implements ITokenService {
       this.redisBlacklist.isOnBlacklist(payload.tokenId)
     );
 
+    // 이미 전체 폐기된 세션은 재사용 감지로 폐기 시각을 다시 갱신하지 않는다.
+    if (payload.iat) {
+      const userRevokedAt = await this.useAuthStore('사용자 무효화 정보 조회', () =>
+        this.redisBlacklist.getUserAndRevokedAt(payload.sub)
+      );
+
+      if (userRevokedAt && userRevokedAt >= payload.iat) {
+        throw Errors.Unauthorized('비정상적인 접근 감지: 블랙리스트 유저 완전차단');
+      }
+    }
+
     if (tokenRevokedAt !== null) {
       // 초 단위 통일
       const now = Math.floor(Date.now() / 1000);
@@ -108,16 +119,6 @@ export class TokenService implements ITokenService {
       if (passedTime > GRACE_PERIOD) {
         await this.revokeAllRefreshTokens(payload.sub);
         throw Errors.Unauthorized('비정상적인 접근 감지: 블랙리스트 등록된 토큰');
-      }
-    }
-
-    if (payload.iat) {
-      const userRevokedAt = await this.useAuthStore('사용자 무효화 정보 조회', () =>
-        this.redisBlacklist.getUserAndRevokedAt(payload.sub)
-      );
-
-      if (userRevokedAt && userRevokedAt >= payload.iat!) {
-        throw Errors.Unauthorized('비정상적인 접근 감지: 블랙리스트 유저 완전차단');
       }
     }
 

@@ -35,10 +35,7 @@ describe('실제 JWT 발급부터 Redis 폐기 기록까지의 토큰 수명주�
         return 'OK';
       }),
     } as unknown as RedisClientType;
-    service = new TokenService(
-      new RedisBlacklistRepository(redis),
-      {} as IRedisSignupRepository
-    );
+    service = new TokenService(new RedisBlacklistRepository(redis), {} as IRedisSignupRepository);
   });
 
   afterEach(() => jest.restoreAllMocks());
@@ -64,23 +61,31 @@ describe('실제 JWT 발급부터 Redis 폐기 기록까지의 토큰 수명주�
     await service.refreshAccessToken(token);
     expect(values.get(key)).toBe(firstRevokedAt);
     expect(set).toHaveBeenCalledWith(key, expect.any(String), {
-      EX: expect.any(Number), NX: true,
+      EX: expect.any(Number),
+      NX: true,
     });
 
     now += 2000;
     await expect(service.refreshAccessToken(token)).rejects.toThrow('블랙리스트 등록된 토큰');
   });
 
-  it('폐기된 세션의 재요청 때문에 재로그인한 세션의 폐기 시각을 옮기지 않는다', async () => {
-    const oldToken = await service.generateRefreshToken('user');
-    await service.revokeAllRefreshTokens('user');
-    now += 1000;
-    const newToken = await service.generateRefreshToken('user');
-    now += 1000;
+  it.each(['전체 폐기', '로그아웃'])(
+    '%s 이후 이전 세션의 재요청이 새 로그인을 폐기하지 않는다',
+    async (reason) => {
+      const oldToken = await service.generateRefreshToken('user');
+      if (reason === '로그아웃') {
+        await service.revokeRefreshToken(oldToken);
+      } else {
+        await service.revokeAllRefreshTokens('user');
+      }
+      now += (GRACE_PERIOD + 1) * 1000;
+      const newToken = await service.generateRefreshToken('user');
+      now += 1000;
 
-    await expect(service.verifyRefreshToken(oldToken)).rejects.toThrow('유저 완전차단');
-    await expect(service.verifyRefreshToken(newToken)).resolves.toMatchObject({ sub: 'user' });
-  });
+      await expect(service.verifyRefreshToken(oldToken)).rejects.toThrow('유저 완전차단');
+      await expect(service.verifyRefreshToken(newToken)).resolves.toMatchObject({ sub: 'user' });
+    }
+  );
 
   it('발급 시각이 없는 토큰은 전체 폐기 검사를 우회할 수 없다', () => {
     const token = jwt.sign(
