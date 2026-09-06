@@ -4,7 +4,7 @@ ENV TZ=UTC
 WORKDIR /usr/src/app
 COPY package*.json ./
 # npm을 사용하여 의존성 설치
-RUN npm install
+RUN npm ci
 COPY . .
 RUN npm run build
 
@@ -13,7 +13,7 @@ FROM node:20-alpine
 ENV TZ=UTC
 WORKDIR /usr/src/app
 COPY package*.json ./
-RUN npm install
+RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /usr/src/app/dist ./dist
 EXPOSE ${PORT:-3000}
-CMD [ "node", "dist/src/web.js" ]
+CMD [ "node", "dist/web.js" ]

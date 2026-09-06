@@ -115,7 +115,7 @@ export class VoteRepository implements IVoteRepository {
     const [result] = await connection.query<ResultSetHeader>(
       `INSERT INTO votes (participant_id, date_option_id, vote_type)
        VALUES ?
-       ON DUPLICATE KEY UPDATE 
+       ON DUPLICATE KEY UPDATE
         vote_type = VALUES(vote_type),
         updated_at = CURRENT_TIMESTAMP`,
       [values]

@@ -1,4 +1,4 @@
-import { ResultSetHeader, RowDataPacket } from 'mysql2';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { PoolConnection } from 'mysql2/promise';
 
 import dbpool from '../config/database';

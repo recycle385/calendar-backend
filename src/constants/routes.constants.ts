@@ -50,7 +50,7 @@ export const PARTICIPANT_ROUTES = {
 
   DELETE_SELF: '/self',
 
-  DELETE_BY_HOST: '/:uuid',
+  DELETE_BY_HOST: '/:participantUuid',
 };
 
 export const VOTE_ROUTES = {

@@ -12,12 +12,13 @@ import {
   dateOptionRepository,
   participantRepository,
   redisBlacklistRepository,
+  redisSignupRepository,
   userRepository,
   voteRepository,
 } from './repository.container';
 
 export const userService = new UserService(userRepository);
-export const tokenService = new TokenService(redisBlacklistRepository);
+export const tokenService = new TokenService(redisBlacklistRepository, redisSignupRepository);
 export const participantService = new ParticipantService(participantRepository);
 
 export const authService = new AuthService(userRepository, tokenService);

@@ -3,9 +3,9 @@ import { RequestHandler } from 'express';
 import { Calendar, SafeCalendar } from '../models';
 import { ICalendarService } from '../services/calendar.service';
 import { IParticipantService } from '../services/participant.service';
+import { ITokenService } from '../services/token.service';
 import { IUserService } from '../services/user.service';
 import { getIO } from '../sockets';
-import { ITokenService } from '../types/token.types';
 import { Errors } from '../utils/errors';
 
 export class CalendarController {
@@ -39,7 +39,7 @@ export class CalendarController {
     const participantToken = await this.tokenService.generateParticipantToken({
       sub: result.participantUuid,
       nickname: hostNickname,
-      calendarId: result.calendar.slug,
+      calendarSlug: result.calendar.slug,
       role: 'host',
 
       userUuid: userUuid,

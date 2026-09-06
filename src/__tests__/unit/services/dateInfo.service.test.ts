@@ -12,6 +12,7 @@ jest.mock('../../../infrastructure/transaction.manager', () => ({
 
 const mockDateInfoRepository: jest.Mocked<IDateInfoRepository> = {
   insertDateInfos: jest.fn(),
+  existsPublicApiByYear: jest.fn(),
   findByIds: jest.fn(),
   findByYears: jest.fn(),
   findByYearBefore: jest.fn(),

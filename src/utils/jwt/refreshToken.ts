@@ -7,6 +7,7 @@ import { RefreshTokenPayload } from '../../types/token.types';
 import { AppError, Errors } from '../errors';
 import { toSeconds } from '../timeConverter';
 import { extractProperty, isRefreshToken, validateDecodedToken } from './helpers';
+import { verifyWithOptionalLegacySecret } from './verifyWithFallback';
 
 // 디코딩 결과 RefreshTokenPayload로 변환
 function toRefreshTokenPayload(decoded: unknown): RefreshTokenPayload {
@@ -47,7 +48,7 @@ export function signRefreshToken(
   };
 
   // jwt.sign은 숫자(초) 또는 문자열 허용 — 숫자 초 단위 사용
-  const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: expirySeconds });
+  const token = jwt.sign(payload, env.REFRESH_JWT_SECRET, { expiresIn: expirySeconds });
 
   return { token, tokenId, expiresInSeconds: expirySeconds };
 }
@@ -55,7 +56,11 @@ export function signRefreshToken(
 // JWT 서명 검증
 export function verifyRefreshTokenSignature(token: string): RefreshTokenPayload {
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET);
+    const decoded = verifyWithOptionalLegacySecret(
+      token,
+      env.REFRESH_JWT_SECRET,
+      env.LEGACY_JWT_SECRET
+    );
     return toRefreshTokenPayload(decoded);
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
@@ -67,7 +72,12 @@ export function verifyRefreshTokenSignature(token: string): RefreshTokenPayload 
 // jwt 서명검증 for revoke
 export function verifyRefreshTokenForRevoke(token: string): RefreshTokenPayload {
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET, { ignoreExpiration: true });
+    const decoded = verifyWithOptionalLegacySecret(
+      token,
+      env.REFRESH_JWT_SECRET,
+      env.LEGACY_JWT_SECRET,
+      { ignoreExpiration: true }
+    );
     return toRefreshTokenPayload(decoded);
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {

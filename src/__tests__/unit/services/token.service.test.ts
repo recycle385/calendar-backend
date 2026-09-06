@@ -1,17 +1,21 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import jsonwebtoken from 'jsonwebtoken';
+
+import { env } from '../../../config/env';
 import { GRACE_PERIOD, REFRESH_TOKEN_EXPIRES_IN } from '../../../constants/token.constants';
+import { IRedisBlacklistRepository } from '../../../repositories/redisBlacklist.repository';
+import { IRedisSignupRepository } from '../../../repositories/redisSignup.repository';
 import { TokenService } from '../../../services/token.service';
+import { GoogleProfileData } from '../../../types/auth.types';
 import {
-  IRedisBlacklistRepository,
   MainTokenPayload,
   ParticipantTokenPayload,
   RefreshTokenPayload,
-  SignupTokenPayload,
 } from '../../../types/token.types';
-import { Errors } from '../../../utils/errors';
 import { toSeconds } from '../../../utils/timeConverter';
 
 jest.mock('../../../utils/jwt', () => {
-  const actual = jest.requireActual('../../../utils/jwt'); // 원본 가져오기
+  const actual = jest.requireActual<typeof import('../../../utils/jwt')>('../../../utils/jwt'); // 원본 가져오기
   return {
     __esModule: true, // ES Module 처리
     ...actual, // 원본 함수들 유지
@@ -29,6 +33,11 @@ const mockRedisBlacklistRepository: jest.Mocked<IRedisBlacklistRepository> = {
   getUserAndRevokedAt: jest.fn(),
 };
 
+const mockRedisSignupRepository: jest.Mocked<IRedisSignupRepository> = {
+  issueSignupToken: jest.fn(),
+  verifySignupToken: jest.fn(),
+};
+
 describe('TokenService 테스트', () => {
   let tokenService: TokenService;
 
@@ -37,8 +46,10 @@ describe('TokenService 테스트', () => {
 
     mockRedisBlacklistRepository.addToBlacklist.mockResolvedValue(undefined);
     mockRedisBlacklistRepository.recordUserAndRevokedAt.mockResolvedValue(undefined);
+    mockRedisSignupRepository.issueSignupToken.mockResolvedValue('signup-token');
+    mockRedisSignupRepository.verifySignupToken.mockResolvedValue(null);
 
-    tokenService = new TokenService(mockRedisBlacklistRepository);
+    tokenService = new TokenService(mockRedisBlacklistRepository, mockRedisSignupRepository);
   });
 
   // 기본 jwt테스트 -----------------------------------------------------
@@ -54,7 +65,7 @@ describe('TokenService 테스트', () => {
         payload: {
           sub: 'participant-uuid',
           nickname: 'Guest',
-          calendarId: 'cal-slug-123',
+          calendarSlug: 'cal-slug-123',
           role: 'guest',
         },
       },
@@ -63,7 +74,7 @@ describe('TokenService 테스트', () => {
         payload: {
           sub: 'participant-uuid',
           nickname: 'GuestUser',
-          calendarId: 'cal-slug-123',
+          calendarSlug: 'cal-slug-123',
           role: 'guest',
           userUuid: 'user-uuid1',
         },
@@ -73,7 +84,7 @@ describe('TokenService 테스트', () => {
         payload: {
           sub: 'participant-uuid',
           nickname: 'HostUser',
-          calendarId: 'cal-slug-123',
+          calendarSlug: 'cal-slug-123',
           role: 'host',
           userUuid: 'user-uuid2',
         },
@@ -84,25 +95,68 @@ describe('TokenService 테스트', () => {
       const generateResult = tokenService.generateParticipantToken(payload);
       const verifiyResult = tokenService.verifyParticipantToken(generateResult);
 
-      expect(verifiyResult).toEqual(expect.objectContaining(payload));
+      expect(verifiyResult).toEqual(
+        expect.objectContaining(payload as unknown as Record<string, unknown>)
+      );
+      expect(verifiyResult.calendarId).toBeUndefined();
+      expect(verifiyResult.calendarSlug).toBe(payload.calendarSlug);
+    });
+
+    it('기존 calendarId 필드로 발급된 참가자 토큰도 calendarSlug로 정규화해 검증한다', () => {
+      const legacyToken = jsonwebtoken.sign(
+        {
+          sub: 'participant-uuid',
+          nickname: 'LegacyUser',
+          calendarId: 'legacy-slug',
+          role: 'guest',
+        },
+        env.PARTICIPANT_JWT_SECRET,
+        { expiresIn: 3600 }
+      );
+
+      const verifyResult = tokenService.verifyParticipantToken(legacyToken);
+
+      expect(verifyResult.calendarSlug).toBe('legacy-slug');
+      expect(verifyResult.calendarId).toBeUndefined();
+    });
+
+    it('기존 단일 JWT secret으로 발급된 참가자 토큰도 전환 기간 동안 검증한다', () => {
+      const legacySecretToken = jsonwebtoken.sign(
+        {
+          sub: 'participant-uuid',
+          nickname: 'LegacySecretUser',
+          calendarId: 'legacy-secret-slug',
+          role: 'guest',
+        },
+        env.LEGACY_JWT_SECRET!,
+        { expiresIn: 3600 }
+      );
+
+      const verifyResult = tokenService.verifyParticipantToken(legacySecretToken);
+
+      expect(verifyResult.calendarSlug).toBe('legacy-secret-slug');
     });
   });
 
   describe('signupToken', () => {
-    const mockSignupTokenPayload: SignupTokenPayload = {
-      googleProfile: {
-        oauth_id: 'oauth-12345',
-        email: 'june@example.com',
-        name: 'June',
-        picture: 'http://example.com/june.jpg',
-      },
+    const mockSignupProfile: GoogleProfileData = {
+      oauth_id: 'oauth-12345',
+      email: 'june@example.com',
+      name: 'June',
+      picture: 'http://example.com/june.jpg',
     };
 
-    it('signup토큰 생성 및 검증', () => {
-      const generateResult = tokenService.generateSignupToken(mockSignupTokenPayload);
-      const verifiyResult = tokenService.verifySignupToken(generateResult);
+    it('signup토큰 생성 및 검증을 Redis signup repository에 위임한다', async () => {
+      mockRedisSignupRepository.issueSignupToken.mockResolvedValue('signup-token');
+      mockRedisSignupRepository.verifySignupToken.mockResolvedValue(mockSignupProfile);
 
-      expect(verifiyResult).toEqual(expect.objectContaining(mockSignupTokenPayload));
+      const generateResult = await tokenService.generateSignupToken(mockSignupProfile);
+      const verifiyResult = await tokenService.verifySignupToken(generateResult);
+
+      expect(generateResult).toBe('signup-token');
+      expect(mockRedisSignupRepository.issueSignupToken).toHaveBeenCalledWith(mockSignupProfile);
+      expect(mockRedisSignupRepository.verifySignupToken).toHaveBeenCalledWith('signup-token');
+      expect(verifiyResult).toEqual(mockSignupProfile);
     });
   });
 
@@ -116,7 +170,36 @@ describe('TokenService 테스트', () => {
       const generateResult = tokenService.generateMainToken(mockMainTokenPayload);
       const verifiyResult = tokenService.verifyMainToken(generateResult);
 
-      expect(verifiyResult).toEqual(expect.objectContaining(mockMainTokenPayload));
+      expect(verifiyResult).toEqual(
+        expect.objectContaining(mockMainTokenPayload as unknown as Record<string, unknown>)
+      );
+    });
+
+    it('main token과 participant token은 서로 다른 secret으로 검증되어야 한다', () => {
+      const mainToken = tokenService.generateMainToken(mockMainTokenPayload);
+      const participantToken = tokenService.generateParticipantToken({
+        sub: 'participant-uuid',
+        nickname: 'Guest',
+        calendarSlug: 'cal-slug-123',
+        role: 'guest',
+      });
+
+      expect(() => tokenService.verifyParticipantToken(mainToken)).toThrow(
+        '유효하지 않은 Participant Token입니다'
+      );
+      expect(() => tokenService.verifyMainToken(participantToken)).toThrow(
+        '유효하지 않은 Access Token입니다'
+      );
+    });
+
+    it('기존 단일 JWT secret으로 발급된 main token도 전환 기간 동안 검증한다', () => {
+      const legacyMainToken = jsonwebtoken.sign(mockMainTokenPayload, env.LEGACY_JWT_SECRET!, {
+        expiresIn: 3600,
+      });
+
+      expect(tokenService.verifyMainToken(legacyMainToken)).toEqual(
+        expect.objectContaining(mockMainTokenPayload as unknown as Record<string, unknown>)
+      );
     });
   });
 
@@ -149,6 +232,27 @@ describe('TokenService 테스트', () => {
         expect.any(Number), // expiresIn
         expect.any(String) // revokedAt
       );
+      expect(mockRedisBlacklistRepository.recordUserAndRevokedAt).toHaveBeenCalledWith(
+        mockPayload.sub,
+        toSeconds(REFRESH_TOKEN_EXPIRES_IN),
+        expect.any(String)
+      );
+    });
+
+    it('[로직] Refresh Token 회전 시 기존 토큰만 폐기하고 사용자 전체 차단은 하지 않아야 한다', async () => {
+      mockRedisBlacklistRepository.isOnBlacklist.mockResolvedValue(null);
+      mockRedisBlacklistRepository.getUserAndRevokedAt.mockResolvedValue(null);
+
+      const result = await tokenService.refreshAccessToken(mockToken);
+
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+      expect(mockRedisBlacklistRepository.addToBlacklist).toHaveBeenCalledWith(
+        mockPayload.tokenId,
+        expect.any(Number),
+        expect.any(String)
+      );
+      expect(mockRedisBlacklistRepository.recordUserAndRevokedAt).not.toHaveBeenCalled();
     });
 
     // 2. 블랙리스트 유예 기간(GRACE_PERIOD) 내 요청 처리

@@ -7,12 +7,16 @@ import { redisClient } from '../config/redis';
 import { logger } from './logger';
 
 const createRedisStore = (prefix: string) => {
-  try {
-    if (!redisClient?.isOpen) {
-      logger.warn(`Redis 미연결 (${prefix}), 메모리 store 사용`);
-      return undefined;
-    }
+  if (!env.ENABLE_RATE_LIMIT) {
+    return undefined;
+  }
 
+  if (!redisClient.isReady) {
+    logger.warn('Redis가 준비되지 않아 rate limit 메모리 store 사용', { prefix });
+    return undefined;
+  }
+
+  try {
     return new RedisStore({
       sendCommand: async (...args: string[]) => {
         try {
@@ -35,6 +39,7 @@ const commonConfig = {
   standardHeaders: true,
   legacyHeaders: false,
   skipFailedRequests: false,
+  passOnStoreError: true,
 };
 
 // 공통 핸들러
@@ -61,7 +66,6 @@ export const rateLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   store: createRedisStore('general'),
-  skip: (req) => env.NODE_ENV === 'development',
   handler: createHandler(
     '요청 제한을 초과했습니다. 잠시 후 다시 시도해주세요.',
     'RATE_LIMIT_EXCEEDED'

@@ -20,6 +20,11 @@ const options = {
           scheme: 'bearer',
           bearerFormat: 'JWT',
         },
+        OperatorAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          description: 'HOST_ACCESS_TOKEN 운영자 토큰',
+        },
       },
     },
   },

@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { GRACE_PERIOD, REFRESH_TOKEN_EXPIRES_IN } from '../../../constants/token.constants';
+import { IRedisBlacklistRepository } from '../../../repositories/redisBlacklist.repository';
+import { IRedisSignupRepository } from '../../../repositories/redisSignup.repository';
 import { TokenService } from '../../../services/token.service';
-import { IRedisBlacklistRepository, RefreshTokenPayload } from '../../../types/token.types';
+import { RefreshTokenPayload } from '../../../types/token.types';
 import { Errors } from '../../../utils/errors';
 import { toSeconds } from '../../../utils/timeConverter';
 
@@ -40,6 +42,11 @@ const mockRedisBlacklistRepository: jest.Mocked<IRedisBlacklistRepository> = {
   addToBlacklist: jest.fn(),
   recordUserAndRevokedAt: jest.fn(),
   getUserAndRevokedAt: jest.fn(),
+};
+
+const mockRedisSignupRepository: jest.Mocked<IRedisSignupRepository> = {
+  issueSignupToken: jest.fn(),
+  verifySignupToken: jest.fn(),
 };
 
 // ========================================================================================
@@ -86,7 +93,7 @@ describe('Redis Fail-closed 인증 전략 테스트', () => {
     mockRedisBlacklistRepository.addToBlacklist.mockResolvedValue(undefined);
     mockRedisBlacklistRepository.recordUserAndRevokedAt.mockResolvedValue(undefined);
 
-    tokenService = new TokenService(mockRedisBlacklistRepository);
+    tokenService = new TokenService(mockRedisBlacklistRepository, mockRedisSignupRepository);
   });
 
   // ========================================================================================

@@ -20,11 +20,7 @@ const pool = mysql.createPool({
 });
 
 pool.on('connection', (connection) => {
-  connection.query(`SET time_zone = '${MYSQL_UTC_TIME_ZONE}'`, (err: Error | null) => {
-    if (err) {
-      console.error('DB 세션 타임존 UTC 설정 실패:', err);
-    }
-  });
+  void connection.query(`SET time_zone = '${MYSQL_UTC_TIME_ZONE}'`);
 });
 
 /**

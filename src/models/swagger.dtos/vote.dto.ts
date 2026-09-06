@@ -54,10 +54,12 @@ export interface VoteRecord {
  *       properties:
  *         selectedDates:
  *           type: array
+ *           minItems: 1
+ *           uniqueItems: true
  *           items:
  *             type: string
  *             format: date
- *           example: "2026-02-15"
+ *           example: ["2026-02-15", "2026-02-16"]
  *           description: "투표할 날짜 리스트 (YYYY-MM-DD)"
  *         voteType:
  *           $ref: "#/components/schemas/VoteTypeForDto"

@@ -12,7 +12,6 @@ export interface ICalendarRepository {
   create(input: CreateCalendarInput, connection?: PoolConnection): Promise<Calendar>;
   findById(id: number, connection?: PoolConnection): Promise<Calendar | null>;
   findBySlug(slug: string, connection?: PoolConnection): Promise<Calendar | null>;
-  findByOwnerId(ownerId: number, connection?: PoolConnection): Promise<Calendar[]>;
   getIdUsingSlug(slug: string, connection?: PoolConnection): Promise<number>;
   update(id: number, input: UpdateCalendarInput, connection?: PoolConnection): Promise<boolean>;
   delete(id: number, connection?: PoolConnection): Promise<boolean>;
@@ -110,20 +109,6 @@ export class CalendarRepository implements ICalendarRepository {
     }
 
     return rows[0].id;
-  }
-
-  /**
-   * 소유자 ID로 캘린더 목록 조회
-   */
-  async findByOwnerId(ownerId: number, connection?: PoolConnection): Promise<Calendar[]> {
-    const poolToUse = connection || this.pool;
-
-    const [rows] = await poolToUse.execute<RowDataPacket[]>(
-      'SELECT * FROM calendars WHERE owner_id = ? ORDER BY created_at DESC',
-      [ownerId]
-    );
-
-    return rows.map((row) => this.mapToCalendar(row));
   }
 
   /**
@@ -265,7 +250,7 @@ export class CalendarRepository implements ICalendarRepository {
     const poolToUse = connection || this.pool;
 
     const [rows] = await poolToUse.execute<RowDataPacket[]>(
-      'SELECT id FROM calendars WHERE expired_at < ?',
+      'SELECT * FROM calendars WHERE expired_at < ?',
       [formatUtcDateTimeForSql(referenceTime)]
     );
 

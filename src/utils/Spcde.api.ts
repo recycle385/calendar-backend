@@ -1,10 +1,12 @@
 import axios from 'axios';
 
 import { env } from '../config/env';
-import { logger } from '../config/logger';
+import { logger } from '../middlewares/logger';
 import { DateKind, dateKindMap, SafeDateInfo, SpcdeItem } from '../models/DateInfo';
 import { AppError, Errors } from '../utils/errors';
 import { normalizeCompactDateOnly, parseDateOnlyToUtcDate } from './dateOnly';
+
+const SPCDE_NUM_OF_ROWS = 100;
 
 export async function getSpcdeInfoUrl(
   year: number,
@@ -17,32 +19,51 @@ export async function getSpcdeInfoUrl(
   }
 
   try {
-    const { data } = await axios.get(
-      `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/${dateKind}`,
-      {
+    const endpoint = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/${dateKind}`;
+    const fetchPage = async (pageNo: number) => {
+      const { data } = await axios.get(endpoint, {
         params: {
           solYear: year,
           ServiceKey: env.GET_REST_DE_INFO,
           _type: 'json',
-          numOfRows: 100,
+          numOfRows: SPCDE_NUM_OF_ROWS,
+          pageNo,
         },
         timeout: 10000,
+      });
+
+      const header = data?.response?.header;
+
+      if (header?.resultCode !== '00') {
+        throw Errors.BadGateway('공공');
       }
-    );
 
-    const header = data?.response?.header;
-    const body = data?.response?.body;
+      return data?.response?.body;
+    };
 
-    if (header?.resultCode !== '00') {
-      throw Errors.BadGateway('공공');
-    }
+    const firstBody = await fetchPage(1);
 
-    if (!body?.items || body.items === '') {
+    if (!firstBody?.items || firstBody.items === '') {
       return [];
     }
 
-    const items = body.items.item;
-    const itemList = Array.isArray(items) ? items : [items];
+    const bodies = [firstBody];
+    const totalCount = Number(firstBody.totalCount ?? 0);
+    const numOfRows = Number(firstBody.numOfRows ?? SPCDE_NUM_OF_ROWS);
+    const totalPages = Math.ceil(totalCount / numOfRows);
+
+    for (let pageNo = 2; pageNo <= totalPages; pageNo++) {
+      const body = await fetchPage(pageNo);
+
+      if (body?.items && body.items !== '') {
+        bodies.push(body);
+      }
+    }
+
+    const itemList = bodies.flatMap((body) => {
+      const items = body.items.item;
+      return Array.isArray(items) ? items : [items];
+    });
 
     return itemList.map(
       (item: SpcdeItem): SafeDateInfo => ({

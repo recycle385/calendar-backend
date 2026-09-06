@@ -1,11 +1,18 @@
 import express from 'express';
 import request from 'supertest';
 
+import { env } from '../../../config/env';
 import { DateInfoController } from '../../../controllers/dateInfo.controller';
 import { errorHandler } from '../../../middlewares/errorHandler';
 import { createDateInfoRouter } from '../../../routes/dateInfo.routes';
 
 describe('DateInfo Batch API Bug Reproduction', () => {
+  const OPERATOR_TOKEN = 'date-info-route-test-operator-token';
+
+  beforeAll(() => {
+    env.HOST_ACCESS_TOKEN = OPERATOR_TOKEN;
+  });
+
   const buildApp = () => {
     const app = express();
     app.use(express.json());
@@ -28,6 +35,7 @@ describe('DateInfo Batch API Bug Reproduction', () => {
 
     const response = await request(app)
       .post('/date-infos/batch')
+      .set('Authorization', `Bearer ${OPERATOR_TOKEN}`)
       .send({
         dateInfos: [
           {
@@ -55,6 +63,7 @@ describe('DateInfo Batch API Bug Reproduction', () => {
 
     const response = await request(app)
       .post('/date-infos/batch')
+      .set('Authorization', `Bearer ${OPERATOR_TOKEN}`)
       .send({
         dateInfoList: [
           {
@@ -70,6 +79,15 @@ describe('DateInfo Batch API Bug Reproduction', () => {
       });
 
     expect(response.status).toBe(400);
+    expect(mockService.addDateInfos).not.toHaveBeenCalled();
+  });
+
+  it('운영자 토큰이 없으면 401로 차단된다', async () => {
+    const { app, mockService } = buildApp();
+
+    const response = await request(app).post('/date-infos/batch').send({ dateInfos: [] });
+
+    expect(response.status).toBe(401);
     expect(mockService.addDateInfos).not.toHaveBeenCalled();
   });
 });

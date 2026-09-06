@@ -3,8 +3,19 @@ import { PoolConnection } from 'mysql2/promise';
 
 import dbpool from '../config/database';
 import { CreateUserInput, User } from '../models';
-import { IUserRepository } from '../types/user.types';
 import { Errors } from '../utils/errors';
+
+export interface IUserRepository {
+  findByOauthId(
+    provider: 'google' | 'kakao',
+    oauthId: string,
+    connection?: PoolConnection
+  ): Promise<User | null>;
+  findUserInfoById(userId: number, connection?: PoolConnection): Promise<User>;
+  findUserInfoByUuid(userUuid: string, connection?: PoolConnection): Promise<User>;
+  getIdUsingUuid(userUuid: string, connection?: PoolConnection): Promise<number>;
+  createUser(userData: CreateUserInput, connection?: PoolConnection): Promise<User>;
+}
 
 export class UserRepository implements IUserRepository {
   constructor(private pool = dbpool) {}

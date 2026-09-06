@@ -11,9 +11,13 @@ import { DefaultResponseDto } from './common.dto';
  *       properties:
  *         nickname:
  *           type: string
+ *           minLength: 1
+ *           maxLength: 20
  *           example: "민수"
  *         password:
  *           type: string
+ *           minLength: 4
+ *           maxLength: 50
  *           example: "1234"
  */
 export interface RegisterParticipantRequest {
@@ -49,12 +53,14 @@ export interface LoginParticipantRequest {
  *       properties:
  *         uuid:
  *           type: string
- *           example: "a1b2c3d4"
+ *           format: uuid
+ *           example: "550e8400-e29b-41d4-a716-446655440000"
  *         nickname:
  *           type: string
  *           example: "민수"
  *         color_code:
  *           type: string
+ *           pattern: "^#[0-9A-Fa-f]{6}$"
  *           example: "#FF0000"
  *         joined_at:
  *           type: string

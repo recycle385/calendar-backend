@@ -18,7 +18,7 @@ export class CalendarSocketController {
       try {
         this.handleLeave(socket);
         logger.info(
-          `유저 ${socket.data.sub}님이 캘린더 방 ${socket.data.calendarId}에서 나갔습니다.`
+          `유저 ${socket.data.sub}님이 캘린더 방 ${socket.data.calendarSlug}에서 나갔습니다.`
         );
       } catch (err) {
         logger.error('leaveCalendarRoom 에러', { error: err });
@@ -41,46 +41,38 @@ export class CalendarSocketController {
 
   private async joinCalendarRoom(socket: CustomSocket) {
     try {
-      // 🚨 [안전장치 1] 변수명 방어 로직
-      // socket.data에 calendarId가 없으면 calendarSlug나 calendar_id도 찾아봅니다.
-      const calendarId =
-        socket.data.calendarId ||
-        (socket.data as any).calendarSlug ||
-        (socket.data as any).calendar_id;
+      const calendarSlug = socket.data.calendarSlug || socket.data.calendarId;
 
       const { nickname, sub, role } = socket.data;
 
-      // 🚨 [안전장치 2] ID 누락 시 즉시 에러 처리
-      if (!calendarId) {
-        logger.error(`방 입장 실패: Calendar ID가 없습니다. User: ${sub}`);
-        // 클라이언트(테스트)에게 에러를 알려줘서 타임아웃 대신 실패하게 함
+      if (!calendarSlug) {
+        logger.error(`방 입장 실패: calendarSlug가 없습니다. User: ${sub}`);
         socket.emit('error', { message: 'Calendar ID is missing in socket data' });
         return;
       }
 
       // [디버깅] 실제 입장 시도 로그
-      logger.debug(`입장 시도 - ID: ${sub}, Room: ${calendarId}`);
+      logger.debug(`입장 시도 - ID: ${sub}, Room: ${calendarSlug}`);
 
-      if (socket.rooms.has(calendarId)) {
-        logger.debug(`이미 방에 존재함: ${calendarId}`);
+      if (socket.rooms.has(calendarSlug)) {
+        logger.debug(`이미 방에 존재함: ${calendarSlug}`);
         return;
       }
 
-      await socket.join(calendarId);
+      await socket.join(calendarSlug);
 
-      logger.info(`아이디: ${sub}가 캘린더 방: ${calendarId} 입장 성공`);
+      logger.info(`아이디: ${sub}가 캘린더 방: ${calendarSlug} 입장 성공`);
 
-      socket.to(calendarId).emit('userOnline', { sub, nickname, role });
+      socket.to(calendarSlug).emit('userOnline', { sub, nickname, role });
 
-      const sockets = await socket.in(calendarId).fetchSockets();
+      const sockets = await socket.nsp.in(calendarSlug).fetchSockets();
 
-      const onlineUsers = sockets.map((s) => {
-        const data = (s as unknown as CustomSocket).data;
-        return { sub: data.sub, nickname: data.nickname, role: data.role };
-      });
-
-      // 내 정보도 포함해서 전송
-      onlineUsers.push({ sub, nickname, role });
+      const onlineUsers = sockets
+        .map((s) => {
+          const data = (s as unknown as CustomSocket).data;
+          return { sub: data.sub, nickname: data.nickname, role: data.role };
+        })
+        .filter((user, index, users) => users.findIndex((item) => item.sub === user.sub) === index);
 
       socket.emit('onlineUsers', onlineUsers);
     } catch (err) {
@@ -91,16 +83,15 @@ export class CalendarSocketController {
 
   private handleLeave(socket: CustomSocket) {
     try {
-      // 나갈 때도 안전하게 체크
-      const calendarId = socket.data.calendarId || (socket.data as any).calendarSlug;
+      const calendarSlug = socket.data.calendarSlug || socket.data.calendarId;
       const { nickname, sub } = socket.data;
 
-      if (calendarId) {
-        socket.leave(calendarId);
+      if (calendarSlug) {
+        socket.leave(calendarSlug);
 
-        socket.to(calendarId).emit('userOffline', { sub, nickname });
+        socket.to(calendarSlug).emit('userOffline', { sub, nickname });
 
-        logger.info(`아이디: ${sub}가 캘린더 방: ${calendarId} 퇴장`);
+        logger.info(`아이디: ${sub}가 캘린더 방: ${calendarSlug} 퇴장`);
       }
     } catch (err) {
       logger.error('handleLeave 에러', { error: err });

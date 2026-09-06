@@ -1,6 +1,9 @@
+import { timingSafeEqual } from 'node:crypto';
+
 import { NextFunction, Request, RequestHandler, Response } from 'express';
 import jwt from 'jsonwebtoken';
 
+import { env } from '../config/env';
 import { tokenService } from '../containers/service.container';
 import { MainTokenPayload, ParticipantTokenPayload } from '../types/token.types';
 import { Errors } from '../utils/errors';
@@ -24,7 +27,9 @@ export interface ParticipantRequest extends Request, ParticipantTokenPayload {
   participantUuid: ParticipantTokenPayload['sub'];
   userRole: ParticipantTokenPayload['role'];
   nickname: ParticipantTokenPayload['nickname'];
-  calendarId: ParticipantTokenPayload['calendarId'];
+  calendarSlug: ParticipantTokenPayload['calendarSlug'];
+  /** @deprecated legacy slug field */
+  calendarId?: ParticipantTokenPayload['calendarId'];
   userUuid?: ParticipantTokenPayload['userUuid'];
 }
 
@@ -82,7 +87,8 @@ export const authenticateParticipant: RequestHandler = (req, res, next) => {
     req.participantUuid = decoded.sub;
     req.userRole = decoded.role;
     req.nickname = decoded.nickname;
-    req.calendarId = decoded.calendarId;
+    req.calendarSlug = decoded.calendarSlug;
+    req.calendarId = decoded.calendarSlug;
 
     req.userUuid = decoded.userUuid;
 
@@ -134,4 +140,29 @@ export const optionalAuth: RequestHandler = (req, res, next) => {
     }
     next(error);
   }
+};
+
+export const authenticateOperator: RequestHandler = (req, res, next) => {
+  const configuredToken = env.HOST_ACCESS_TOKEN;
+
+  if (!configuredToken) {
+    return next(Errors.Internal('운영자 인증 토큰이 설정되지 않았습니다'));
+  }
+
+  const providedToken = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!providedToken) {
+    return next(Errors.Unauthorized('운영자 인증 토큰이 필요합니다'));
+  }
+
+  const configuredBuffer = Buffer.from(configuredToken);
+  const providedBuffer = Buffer.from(providedToken);
+  const isValid =
+    configuredBuffer.length === providedBuffer.length &&
+    timingSafeEqual(configuredBuffer, providedBuffer);
+
+  if (!isValid) {
+    return next(Errors.Forbidden('유효하지 않은 운영자 인증 토큰입니다'));
+  }
+
+  next();
 };

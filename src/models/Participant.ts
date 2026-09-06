@@ -46,20 +46,25 @@ export type CreateParticipantInput =
   | UserGuestParticipantInput
   | GuestParticipantInput;
 
+interface BaseParticipantServiceInput {
+  calendarId: number;
+  nickname: string;
+  role?: 'host' | 'guest';
+}
+
+export interface UserParticipantServiceInput extends BaseParticipantServiceInput {
+  userId: number;
+  password?: never;
+}
+
+export interface AnonymousParticipantServiceInput extends BaseParticipantServiceInput {
+  password: string;
+  userId?: never;
+}
+
 export type ParticipantServiceInput =
-  | {
-      userId: number;
-      calendarId: number;
-      nickname: string;
-      role?: 'host' | 'guest';
-    }
-  | {
-      password: string;
-      calendarId: number;
-      nickname: string;
-      role?: 'host' | 'guest';
-      userId?: never;
-    };
+  | UserParticipantServiceInput
+  | AnonymousParticipantServiceInput;
 
 // 로그인용 (비밀번호 검증)
 export interface ParticipantLoginInput {

@@ -32,7 +32,6 @@ export interface ICalendarService {
   ): Promise<{ calendar: Calendar; shareUrl: string; participantUuid: string }>;
   getCalendarBySlug(slug: string): Promise<Calendar>;
   getCalendarById(id: number): Promise<Calendar>;
-  getUserCalendars(ownerId: number): Promise<Calendar[]>;
   updateCalendar(slug: string, ownerId: number, input: UpdateCalendarInput): Promise<Calendar>;
   deleteCalendar(slug: string, ownerId: number): Promise<void>;
   closeCalendar(slug: string, ownerId: number): Promise<Calendar>;
@@ -206,13 +205,6 @@ export class CalendarService implements ICalendarService {
     return await this.calendarRepository.getIdUsingSlug(slug);
   }
 
-  /**
-   * TOdo: 사용자의 캘린더 목록 조회 => 참가자uuid포함해서 반환하는 메서드로 변경할것, 현재 메서드가 사용중인 부분 확인 후 삭제
-   */
-  async getUserCalendars(ownerId: number): Promise<Calendar[]> {
-    return await this.calendarRepository.findByOwnerId(ownerId);
-  }
-
   async getUserCalendarsWithPUuids(ownerId: number): Promise<CalendarWithHostUuid[]> {
     return await this.calendarRepository.getCalAndPUuidDatasByUserIds(ownerId);
   }
@@ -239,24 +231,53 @@ export class CalendarService implements ICalendarService {
 
     const hasStartDate = input.start_date !== undefined;
     const hasEndDate = input.end_date !== undefined;
+    const updateInput: UpdateCalendarInput = { ...input };
+    let effectiveStartDate = calendar.start_date.toString();
+    let effectiveEndDate = calendar.end_date.toString();
 
     // 날짜 범위 검증
     if (hasStartDate || hasEndDate) {
       const startDate = input.start_date || calendar.start_date;
       const endDate = input.end_date || calendar.end_date;
       const dateRange = this.validateDateRange(startDate.toString(), endDate.toString());
+      effectiveStartDate = dateRange.startDate;
+      effectiveEndDate = dateRange.endDate;
 
       if (hasStartDate) {
-        input.start_date = dateRange.startDate;
+        updateInput.start_date = dateRange.startDate;
       }
 
       if (hasEndDate) {
-        input.end_date = dateRange.endDate;
-        input.expired_at = addDateOnlyDays(dateRange.endDate, CALENDAR_GRACE_PERIOD);
+        updateInput.end_date = dateRange.endDate;
+        updateInput.expired_at = addDateOnlyDays(dateRange.endDate, CALENDAR_GRACE_PERIOD);
       }
     }
 
-    const updated = await this.calendarRepository.update(calendar.id, input);
+    const updated =
+      hasStartDate || hasEndDate
+        ? await TransactionManager.run(async (con) => {
+            const isUpdated = await this.calendarRepository.update(calendar.id, updateInput, con);
+
+            if (!isUpdated) {
+              return false;
+            }
+
+            await this.dateOptionRepository.deleteOutsideRange(
+              calendar.id,
+              effectiveStartDate,
+              effectiveEndDate,
+              con
+            );
+
+            await this.dateOptionRepository.createBatch(
+              calendar.id,
+              eachDateOnlyInRange(effectiveStartDate, effectiveEndDate),
+              con
+            );
+
+            return true;
+          })
+        : await this.calendarRepository.update(calendar.id, updateInput);
 
     if (!updated) {
       throw Errors.Internal('캘린더 수정에 실패했습니다');

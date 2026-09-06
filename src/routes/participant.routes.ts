@@ -130,7 +130,7 @@ export const createParticipantRouter = (controller: ParticipantController): Rout
 
   /**
    * @swagger
-   * /api/v1/calendars/{slug}/participant/self:
+   * /api/v1/calendars/{slug}/participants/self:
    *   delete:
    *     summary: 참가자 삭제 (스스로)
    *     description: 본인만 가능, 토큰 필요
@@ -165,7 +165,7 @@ export const createParticipantRouter = (controller: ParticipantController): Rout
 
   /**
    * @swagger
-   * /api/v1/calendars/{slug}/participant/{participantUuid}:
+   * /api/v1/calendars/{slug}/participants/{participantUuid}:
    *   delete:
    *     summary: 방장의 유저 강퇴
    *     description: 방장만 가능

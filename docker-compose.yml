@@ -1,14 +1,9 @@
-version: '3.8'
-
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: calendar_app_service
-    command: npm run dev
-    volumes:
-      - ./src:/usr/src/app/src
     ports:
       - '${PORT:-3000}:${PORT:-3000}'
     env_file:
@@ -35,6 +30,7 @@ services:
       - '3306:3306'
     volumes:
       - ./src/models/schema/calendar_db.sql:/docker-entrypoint-initdb.d/calendar_db.sql:ro
+      - db_data:/var/lib/mysql
     restart: always
 
   redis:

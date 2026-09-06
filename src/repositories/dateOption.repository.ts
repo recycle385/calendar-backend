@@ -22,6 +22,12 @@ export interface IDateOptionRepository {
     dateValue: string,
     connection?: PoolConnection
   ): Promise<DateOption | null>;
+  deleteOutsideRange(
+    calendarId: number,
+    startDate: string,
+    endDate: string,
+    connection?: PoolConnection
+  ): Promise<number>;
   delete(id: number, connection?: PoolConnection): Promise<boolean>;
   deleteByCalendarId(calendarId: number, connection?: PoolConnection): Promise<number>;
 }
@@ -155,6 +161,24 @@ export class DateOptionRepository implements IDateOptionRepository {
     }
 
     return this.mapToDateOption(rows[0]);
+  }
+
+  async deleteOutsideRange(
+    calendarId: number,
+    startDate: string,
+    endDate: string,
+    connection?: PoolConnection
+  ): Promise<number> {
+    const poolToUse = connection || this.pool;
+
+    const [result] = await poolToUse.execute<ResultSetHeader>(
+      `DELETE FROM date_options
+       WHERE calendar_id = ?
+         AND (date_value < ? OR date_value > ?)`,
+      [calendarId, formatDateOnly(startDate), formatDateOnly(endDate)]
+    );
+
+    return result.affectedRows;
   }
 
   async delete(id: number, connection?: PoolConnection): Promise<boolean> {

@@ -28,3 +28,7 @@ export function toSeconds(duration: string): number {
 
   return seconds;
 }
+
+export function toMilliseconds(duration: string): number {
+  return toSeconds(duration) * 1000;
+}

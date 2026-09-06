@@ -23,7 +23,7 @@ const corsOptions: cors.CorsOptions = {
    * methods: 허용할 HTTP 메서드를 지정합니다.
    * 나중에 필요한 메서드만 남기고 제거
    */
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
   /**
    * allowedHeaders: 요청 헤더에 포함될 수 있는 커스텀 헤더를 지정합니다.

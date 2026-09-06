@@ -32,6 +32,10 @@ export class VoteService implements IVoteService {
     selectedDates: string[],
     voteType: VoteType = 'available'
   ): Promise<number> {
+    if (selectedDates.length === 0) {
+      throw Errors.BadRequest('최소 하나 이상의 날짜를 선택해야 합니다');
+    }
+
     const dateOption = await this.dateOptionRepository.findDateOptionsByCalendarAndDate(
       calendarId,
       selectedDates

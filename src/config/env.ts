@@ -9,7 +9,10 @@ if (process.env.NODE_ENV === 'test') {
 interface EnvConfig {
   PORT: number;
   NODE_ENV: string;
-  JWT_SECRET: string;
+  MAIN_JWT_SECRET: string;
+  PARTICIPANT_JWT_SECRET: string;
+  REFRESH_JWT_SECRET: string;
+  LEGACY_JWT_SECRET?: string;
   SESSION_SECRET: string;
   REDIS_URL: string;
   DB_HOST: string;
@@ -21,15 +24,41 @@ interface EnvConfig {
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   BACKEND_URL: string;
-  SIGNUP_MODE: string;
+  SIGNUP_MODE: 'pending' | 'immediate';
   DB_CONNECTION_LIMIT: number;
-  ENABLE_RATE_LIMIT: string;
+  ENABLE_RATE_LIMIT: boolean;
   HOST_ACCESS_TOKEN?: string;
+}
+
+function parseBooleanEnv(key: string): boolean {
+  const value = process.env[key];
+
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  throw new Error(`${key}는 true 또는 false여야 합니다. 현재 값: ${value}`);
+}
+
+function parseSignupMode(): EnvConfig['SIGNUP_MODE'] {
+  const value = process.env.SIGNUP_MODE;
+
+  if (value === 'pending' || value === 'immediate') {
+    return value;
+  }
+
+  throw new Error(`SIGNUP_MODE는 pending 또는 immediate여야 합니다. 현재 값: ${value}`);
 }
 
 function validateEnv(): EnvConfig {
   const required = [
-    'JWT_SECRET',
+    'MAIN_JWT_SECRET',
+    'PARTICIPANT_JWT_SECRET',
+    'REFRESH_JWT_SECRET',
     'SESSION_SECRET',
     'DB_HOST',
     'DB_USER',
@@ -58,6 +87,8 @@ function validateEnv(): EnvConfig {
   }
 
   const connectionLimit = Number(process.env.DB_CONNECTION_LIMIT);
+  const signupMode = parseSignupMode();
+  const enableRateLimit = parseBooleanEnv('ENABLE_RATE_LIMIT');
 
   if (!Number.isInteger(connectionLimit) || connectionLimit <= 0) {
     throw new Error(
@@ -68,7 +99,10 @@ function validateEnv(): EnvConfig {
   return {
     PORT: parseInt(process.env.PORT!, 10),
     NODE_ENV: process.env.NODE_ENV!,
-    JWT_SECRET: process.env.JWT_SECRET!,
+    MAIN_JWT_SECRET: process.env.MAIN_JWT_SECRET!,
+    PARTICIPANT_JWT_SECRET: process.env.PARTICIPANT_JWT_SECRET!,
+    REFRESH_JWT_SECRET: process.env.REFRESH_JWT_SECRET!,
+    LEGACY_JWT_SECRET: process.env.LEGACY_JWT_SECRET,
     SESSION_SECRET: process.env.SESSION_SECRET!,
     REDIS_URL: process.env.REDIS_URL!,
     DB_HOST: process.env.DB_HOST!,
@@ -80,9 +114,9 @@ function validateEnv(): EnvConfig {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID!,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET!,
     BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:4000',
-    SIGNUP_MODE: process.env.SIGNUP_MODE!,
+    SIGNUP_MODE: signupMode,
     DB_CONNECTION_LIMIT: connectionLimit,
-    ENABLE_RATE_LIMIT: process.env.ENABLE_RATE_LIMIT!,
+    ENABLE_RATE_LIMIT: enableRateLimit,
     HOST_ACCESS_TOKEN: process.env.HOST_ACCESS_TOKEN,
   };
 }

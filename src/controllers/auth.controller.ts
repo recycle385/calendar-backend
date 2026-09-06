@@ -5,11 +5,11 @@ import { env } from '../config/env';
 import { API_PREFIX, AUTH_ROUTES } from '../constants/routes.constants';
 import { REFRESH_TOKEN_EXPIRES_IN } from '../constants/token.constants';
 import { User } from '../models';
+import { IAuthService } from '../services/auth.service';
 import { OAuthCallbackResponse, SafeUser } from '../types/auth.types';
 import { TokenPair } from '../types/token.types';
-import { IAuthService } from '../types/user.types';
 import { Errors } from '../utils/errors';
-import { toSeconds } from '../utils/timeConverter';
+import { toMilliseconds } from '../utils/timeConverter';
 
 const OAUTH_STATE_COOKIE = 'oauth_state';
 const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
@@ -91,7 +91,7 @@ export class AuthController {
 
     res.cookie('jwt', oAuthCallbackResponse.token.refreshToken, {
       ...this.cookieOptions,
-      maxAge: toSeconds(REFRESH_TOKEN_EXPIRES_IN),
+      maxAge: toMilliseconds(REFRESH_TOKEN_EXPIRES_IN),
     });
 
     return res.status(200).json({
@@ -109,7 +109,7 @@ export class AuthController {
 
     res.cookie('jwt', signupResponse.tokenPair.refreshToken, {
       ...this.cookieOptions,
-      maxAge: toSeconds(REFRESH_TOKEN_EXPIRES_IN),
+      maxAge: toMilliseconds(REFRESH_TOKEN_EXPIRES_IN),
     });
 
     return res.status(200).json({
@@ -131,7 +131,7 @@ export class AuthController {
 
       res.cookie('jwt', newTokenPair.refreshToken, {
         ...this.cookieOptions,
-        maxAge: toSeconds(REFRESH_TOKEN_EXPIRES_IN),
+        maxAge: toMilliseconds(REFRESH_TOKEN_EXPIRES_IN),
       });
 
       return res.status(200).json({

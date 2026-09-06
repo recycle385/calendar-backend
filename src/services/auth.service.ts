@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { TransactionManager } from '../infrastructure/transaction.manager';
 import { User } from '../models';
 import { CreateUserInput } from '../models';
+import { IUserRepository } from '../repositories/user.repository';
 import {
   ExistingUserResponse,
   GoogleProfileData,
@@ -14,10 +15,19 @@ import {
   NewUserImmediateSignupResponse,
   OAuthCallbackResponse,
 } from '../types/auth.types';
-import { ITokenService, SignupTokenPayload, TokenPair } from '../types/token.types';
-import { IUserRepository } from '../types/user.types';
-import { IAuthService } from '../types/user.types';
+import { TokenPair } from '../types/token.types';
 import { Errors } from '../utils/errors';
+import { ITokenService } from './token.service';
+
+export interface IAuthService {
+  handleGoogleCallback(code: string): Promise<OAuthCallbackResponse>;
+  handleGoogleSignup(
+    signUpToken: string,
+    isTermsAgreed: boolean
+  ): Promise<{ tokenPair: TokenPair; user: User }>;
+  refreshToken(refreshToken: string): Promise<TokenPair>;
+  revokeRefreshToken(token: string): Promise<void>;
+}
 
 export class AuthService implements IAuthService {
   constructor(
@@ -76,9 +86,13 @@ export class AuthService implements IAuthService {
     }
 
     // 페이로드에서 구글 프로필 정보 검증 및 추출
-    const payload = this.tokenService.verifySignupToken(signUpToken);
+    const payload = await this.tokenService.verifySignupToken(signUpToken);
 
-    const signupProcessResult = await this.signupProcess(payload.googleProfile, isTermsAgreed);
+    if (!payload) {
+      throw Errors.BadRequest('유효하지 않은 회원가입 토큰입니다');
+    }
+
+    const signupProcessResult = await this.signupProcess(payload, isTermsAgreed);
 
     return signupProcessResult;
   }
@@ -136,16 +150,7 @@ export class AuthService implements IAuthService {
   private async handlePendingNewUser(
     user: GoogleProfileData
   ): Promise<NewUserCallbackSignupResponse> {
-    const newUserpayload: SignupTokenPayload = {
-      googleProfile: {
-        oauth_id: user.oauth_id,
-        email: user.email,
-        name: user.name,
-        picture: user.picture,
-      },
-    };
-
-    const newUserToken = this.tokenService.generateSignupToken(newUserpayload);
+    const newUserToken = await this.tokenService.generateSignupToken(user);
     const newUserResponse: NewUserCallbackSignupResponse = {
       type: 'pendingSignup',
       signupToken: newUserToken,

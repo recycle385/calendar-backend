@@ -1,14 +1,14 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+
 import { CalendarRepository } from '../../../repositories/calendar.repository';
 
 describe('CalendarRepository UTC 기준 조회', () => {
-  let mockPool: {
-    execute: jest.Mock;
-  };
+  let mockPool: { execute: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>> };
   let repository: CalendarRepository;
 
   beforeEach(() => {
     mockPool = {
-      execute: jest.fn().mockResolvedValue([[]]),
+      execute: jest.fn(async () => [[]]),
     };
     repository = new CalendarRepository(mockPool as any);
   });
@@ -25,14 +25,13 @@ describe('CalendarRepository UTC 기준 조회', () => {
   it('findExpired는 DB NOW 대신 UTC datetime 파라미터를 사용해야 한다', async () => {
     await repository.findExpired(undefined, new Date('2026-06-08T23:30:15.000Z'));
 
-    expect(mockPool.execute).toHaveBeenCalledWith(
-      'SELECT id FROM calendars WHERE expired_at < ?',
-      ['2026-06-08 23:30:15']
-    );
+    expect(mockPool.execute).toHaveBeenCalledWith('SELECT * FROM calendars WHERE expired_at < ?', [
+      '2026-06-08 23:30:15',
+    ]);
   });
 
   it('DATE 컬럼은 Date 객체가 아니라 YYYY-MM-DD 문자열로 매핑해야 한다', async () => {
-    mockPool.execute.mockResolvedValueOnce([
+    mockPool.execute.mockImplementationOnce(async () => [
       [
         {
           id: 1,

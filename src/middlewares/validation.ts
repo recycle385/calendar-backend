@@ -192,10 +192,7 @@ export const voteSchemas = {
   subVoteRequest: Joi.object({
     selectedDates: Joi.array()
       .items(
-        Joi.string()
-          .trim()
-          .required()
-          .custom(normalizeDateOnlyForJoi, 'Normalize date-only string')
+        Joi.string().trim().required().custom(normalizeDateOnlyForJoi, 'Normalize date-only string')
       )
       .min(1)
       .unique()

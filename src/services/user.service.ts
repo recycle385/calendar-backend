@@ -1,4 +1,4 @@
-import { IUserRepository } from '../types/user.types';
+import { IUserRepository } from '../repositories/user.repository';
 
 export interface IUserService {
   getIdUsingUuid(userUuid: string): Promise<number>;

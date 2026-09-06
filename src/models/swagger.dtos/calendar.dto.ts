@@ -70,6 +70,8 @@ export interface SafeCalendarDto {
  *       properties:
  *         title:
  *           type: string
+ *           minLength: 1
+ *           maxLength: 100
  *           example: "팀 프로젝트 회의"
  *         start_date:
  *           type: string
@@ -85,6 +87,8 @@ export interface SafeCalendarDto {
  *           nullable: true
  *         hostNickname:
  *           type: string
+ *           minLength: 1
+ *           maxLength: 20
  *           example: "방장"
  */
 export interface CreateCalendarRequest {
@@ -104,6 +108,8 @@ export interface CreateCalendarRequest {
  *       properties:
  *         title:
  *           type: string
+ *           minLength: 1
+ *           maxLength: 100
  *           example: "팀 프로젝트 회의"
  *         description:
  *           type: string

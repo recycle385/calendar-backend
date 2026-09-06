@@ -22,7 +22,7 @@ registerMiddlewares(app);
 
 app.use(requestLogger);
 
-if (env.ENABLE_RATE_LIMIT === 'true') {
+if (env.ENABLE_RATE_LIMIT) {
   app.use(API_PREFIX, rateLimiter);
 }
 

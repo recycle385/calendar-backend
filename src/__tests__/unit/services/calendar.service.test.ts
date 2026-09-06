@@ -21,7 +21,6 @@ const mockCalendarRepository: jest.Mocked<ICalendarRepository> = {
   create: jest.fn(),
   findById: jest.fn(),
   findBySlug: jest.fn(),
-  findByOwnerId: jest.fn(),
   getIdUsingSlug: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
@@ -58,6 +57,7 @@ const mockDateOptionRepository: jest.Mocked<IDateOptionRepository> = {
   findByCalendarId: jest.fn(),
   findDateOptionsByCalendarAndDate: jest.fn(),
   findByCalendarAndDate: jest.fn(),
+  deleteOutsideRange: jest.fn(),
   delete: jest.fn(),
   deleteByCalendarId: jest.fn(),
 };
@@ -288,7 +288,42 @@ describe('CalendarService Unit Test', () => {
         expect.objectContaining({
           end_date: newEndDate,
           expired_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), // 날짜 형식 문자열 확인
-        })
+        }),
+        expect.anything()
+      );
+      expect(mockDateOptionRepository.deleteOutsideRange).toHaveBeenCalledWith(
+        existingCalendar.id,
+        existingCalendar.start_date,
+        newEndDate,
+        expect.anything()
+      );
+      expect(mockDateOptionRepository.createBatch).toHaveBeenCalledWith(
+        existingCalendar.id,
+        expect.arrayContaining(['2025-01-04', '2025-02-01']),
+        expect.anything()
+      );
+    });
+
+    it('[로직] 시작일 수정 시 날짜 옵션 범위를 새 시작일 기준으로 동기화해야 한다', async () => {
+      mockCalendarRepository.findBySlug.mockResolvedValue(existingCalendar);
+      mockCalendarRepository.update.mockResolvedValue(true);
+      mockCalendarRepository.findById.mockResolvedValue({
+        ...existingCalendar,
+        start_date: '2025-01-02',
+      } as Calendar);
+
+      await calendarService.updateCalendar(slug, ownerId, { start_date: '2025-01-02' });
+
+      expect(mockDateOptionRepository.deleteOutsideRange).toHaveBeenCalledWith(
+        existingCalendar.id,
+        '2025-01-02',
+        existingCalendar.end_date,
+        expect.anything()
+      );
+      expect(mockDateOptionRepository.createBatch).toHaveBeenCalledWith(
+        existingCalendar.id,
+        ['2025-01-02', '2025-01-03'],
+        expect.anything()
       );
     });
   });

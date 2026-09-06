@@ -37,8 +37,6 @@ describe('utcDate util', () => {
   });
 
   it('formatUtcDateTimeForSql은 DB 비교용 UTC datetime 문자열을 반환해야 한다', () => {
-    expect(formatUtcDateTimeForSql('2026-04-28T00:30:15+09:00')).toBe(
-      '2026-04-27 15:30:15'
-    );
+    expect(formatUtcDateTimeForSql('2026-04-28T00:30:15+09:00')).toBe('2026-04-27 15:30:15');
   });
 });

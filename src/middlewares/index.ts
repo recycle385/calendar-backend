@@ -1,7 +1,13 @@
 import cookieParser from 'cookie-parser';
 import express from 'express';
 
-export { authenticateParticipant, authenticateUser, authorize, optionalAuth } from './auth';
+export {
+  authenticateOperator,
+  authenticateParticipant,
+  authenticateUser,
+  authorize,
+  optionalAuth,
+} from './auth';
 export { corsMiddleware } from './cors';
 export { errorHandler, notFoundHandler } from './errorHandler';
 export { requestLogger } from './logger';

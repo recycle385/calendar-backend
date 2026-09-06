@@ -4,7 +4,6 @@ import { PoolConnection } from 'mysql2/promise';
 import dbpool from '../config/database';
 import { DataSource, DateInfo, DateKind, DateNamePair, SafeDateInfo } from '../models/DateInfo';
 import { formatDateOnly, parseDateOnlyToUtcDate } from '../utils/dateOnly';
-import { Errors } from '../utils/errors';
 
 export interface IDateInfoRepository {
   insertDateInfos(dateInfoList: SafeDateInfo[], connection?: PoolConnection): Promise<number>;
@@ -94,6 +93,10 @@ export class DateInfoRepository implements IDateInfoRepository {
   ): Promise<number> {
     const poolToUse = connection || this.pool;
 
+    if (dateInfoList.length === 0) {
+      return 0;
+    }
+
     const values = dateInfoList.map(
       ({ locationDate, year, seq, dateName, dateKind, isHoliday, dataSource }) => {
         const loc = formatDateOnly(locationDate);
@@ -101,13 +104,18 @@ export class DateInfoRepository implements IDateInfoRepository {
       }
     );
 
-    const [result] = await poolToUse.query<ResultSetHeader>(
+    await poolToUse.query<ResultSetHeader>(
       `INSERT INTO date_info (location_date, year, seq, date_name, date_kind, is_holiday, data_source)
-    VALUES ?`,
+       VALUES ?
+       ON DUPLICATE KEY UPDATE
+         year = VALUES(year),
+         date_name = VALUES(date_name),
+         is_holiday = VALUES(is_holiday),
+         data_source = VALUES(data_source)`,
       [values]
     );
 
-    return result.affectedRows;
+    return dateInfoList.length;
   }
 
   async findByIds(ids: number[], connection?: PoolConnection): Promise<DateInfo[]> {

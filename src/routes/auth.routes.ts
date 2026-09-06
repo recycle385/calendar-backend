@@ -62,7 +62,7 @@ export const createAuthRouter = (controller: AuthController): Router => {
 
   /**
    * @swagger
-   * /api/v1/auth/google/signup:
+   * /api/v1/auth/register:
    *   post:
    *     summary: 구글 회원가입 완료
    *     tags: [Auth]

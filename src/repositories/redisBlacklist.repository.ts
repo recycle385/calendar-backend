@@ -1,7 +1,11 @@
 import { RedisClientType } from 'redis';
 
-import { logger } from '../middlewares/logger';
-import { IRedisBlacklistRepository } from '../types/token.types';
+export interface IRedisBlacklistRepository {
+  isOnBlacklist(tokenId: string): Promise<number | null>;
+  addToBlacklist(tokenId: string, expiresIn: number, revokedAt: string): Promise<void>;
+  recordUserAndRevokedAt(userId: string, expiresIn: number, revokedAt: string): Promise<void>;
+  getUserAndRevokedAt(userId: string): Promise<number | null>;
+}
 
 export class RedisBlacklistRepository implements IRedisBlacklistRepository {
   constructor(private redis: RedisClientType) {}

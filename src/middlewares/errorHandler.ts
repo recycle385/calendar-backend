@@ -2,7 +2,7 @@ import { NextFunction, Request, RequestHandler, Response } from 'express';
 
 import { env } from '../config/env';
 import { AppError, Errors } from '../utils/errors';
-import { logger } from './logger';
+import { logger, sanitizeData } from './logger';
 
 export const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
   const isError = err instanceof Error;
@@ -30,7 +30,7 @@ export const errorHandler = (err: unknown, req: Request, res: Response, next: Ne
     stack: isError ? err.stack : undefined,
     url: req.originalUrl,
     method: req.method,
-    body: req.body,
+    body: sanitizeData(req.body),
   });
 
   // 프로덕션에서는 상세 에러 숨김

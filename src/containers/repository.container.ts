@@ -7,11 +7,16 @@ import {
   IParticipantRepository,
   ParticipantRepository,
 } from '../repositories/participant.repository';
-import { RedisBlacklistRepository } from '../repositories/redisBlacklist.repository';
-import { UserRepository } from '../repositories/user.repository';
+import {
+  IRedisBlacklistRepository,
+  RedisBlacklistRepository,
+} from '../repositories/redisBlacklist.repository';
+import {
+  IRedisSignupRepository,
+  RedisSignupRepository,
+} from '../repositories/redisSignup.repository';
+import { IUserRepository, UserRepository } from '../repositories/user.repository';
 import { IVoteRepository, VoteRepository } from '../repositories/vote.repository';
-import { IRedisBlacklistRepository } from '../types/token.types';
-import { IUserRepository } from '../types/user.types';
 const db = pool;
 
 export const calendarRepository: ICalendarRepository = new CalendarRepository(db);
@@ -23,3 +28,4 @@ export const dateInfoRepository: IDateInfoRepository = new DateInfoRepository(db
 export const redisBlacklistRepository: IRedisBlacklistRepository = new RedisBlacklistRepository(
   redisClient
 );
+export const redisSignupRepository: IRedisSignupRepository = new RedisSignupRepository(redisClient);

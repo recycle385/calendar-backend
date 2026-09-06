@@ -5,12 +5,9 @@ import { env } from './env';
 
 const REDIS_URL = env.REDIS_URL;
 
-let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
 const reconnectStrategy = (retries: number) => {
-  reconnectAttempts = retries;
-
   // 최대 재연결 시도 제한
   if (retries > MAX_RECONNECT_ATTEMPTS) {
     logger.error(`Redis 재연결 ${MAX_RECONNECT_ATTEMPTS}회 실패`);
@@ -31,7 +28,6 @@ redisClient.on('error', (err) => {
   logger.error('Redis Client 오류', err);
 });
 redisClient.on('connect', () => {
-  reconnectAttempts = 0; // 연결 성공 시 카운터 리셋
   logger.info('Redis에 연결 중');
 });
 redisClient.on('ready', () => {
@@ -41,11 +37,12 @@ redisClient.on('end', () => {
   logger.warn('Redis 연결 종료');
 });
 
-export async function connectRedis() {
-  if (redisClient.isOpen) return;
+export async function connectRedis(): Promise<boolean> {
+  if (redisClient.isOpen) return true;
   try {
     await redisClient.connect();
     logger.info('redis 연결 성공');
+    return true;
   } catch (err) {
     logger.error('redis 연결실패:', err);
     return false;

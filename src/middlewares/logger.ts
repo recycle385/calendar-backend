@@ -1,6 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
 import fs from 'fs';
-import morgan from 'morgan';
 import path from 'path';
 import winston from 'winston';
 
@@ -45,7 +44,7 @@ if (env.NODE_ENV !== 'production') {
 }
 
 // 민감 정보 필터링 함수
-const sanitizeData = (data: any): any => {
+export const sanitizeData = (data: any): any => {
   if (!data || typeof data !== 'object') return data;
 
   const sensitiveFields = ['password', 'token', 'accessToken', 'refreshToken', 'secret'];
@@ -95,14 +94,3 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
 
   next();
 };
-
-// Morgan은 간단한 액세스 로그용으로만 사용 (선택사항)
-export const morganLogger = morgan(
-  ':method :url :status :res[content-length] - :response-time ms',
-  {
-    skip: (req, res) => env.NODE_ENV === 'test', // 테스트 환경에서는 스킵
-    stream: {
-      write: (message: string) => logger.http(message.trim()),
-    },
-  }
-);

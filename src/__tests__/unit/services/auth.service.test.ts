@@ -1,17 +1,19 @@
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
 import { env } from '../../../config/env';
 import { CreateUserInput, User } from '../../../models';
+import { IUserRepository } from '../../../repositories/user.repository';
 import { AuthService } from '../../../services';
-import { ITokenService, SignupTokenPayload } from '../../../types/token.types';
-import { IUserRepository } from '../../../types/user.types';
+import { ITokenService } from '../../../services/token.service';
+import { GoogleProfileData } from '../../../types/auth.types';
 import { Errors } from '../../../utils/errors';
 
 jest.mock('axios');
 jest.mock('../../../infrastructure/transaction.manager', () => ({
   TransactionManager: {
-    run: jest.fn((callback) => callback({})),
+    run: jest.fn((callback: (connection: unknown) => unknown) => callback({})),
   },
 }));
 jest.mock('uuid');
@@ -27,7 +29,6 @@ const mockUserRepository: jest.Mocked<IUserRepository> = {
 const mockTokenService: jest.Mocked<ITokenService> = {
   verifySignupToken: jest.fn(),
   verifyMainToken: jest.fn(),
-  verifyUserToken: jest.fn(),
   generateMainToken: jest.fn(),
 
   generateParticipantToken: jest.fn(),
@@ -62,8 +63,12 @@ describe('AuthService 테스트', () => {
     };
 
     beforeEach(() => {
-      (axios.post as jest.Mock).mockResolvedValue({ data: mockGoogleTokens });
-      (axios.get as jest.Mock).mockResolvedValue({ data: mockGoogleProfile });
+      (axios.post as jest.MockedFunction<typeof axios.post>).mockResolvedValue({
+        data: mockGoogleTokens,
+      });
+      (axios.get as jest.MockedFunction<typeof axios.get>).mockResolvedValue({
+        data: mockGoogleProfile,
+      });
     });
 
     afterEach(() => {
@@ -100,19 +105,17 @@ describe('AuthService 테스트', () => {
     });
 
     it('[성공] 신규 회원인 경우(Pending): pendingSignup 타입,signupToken 반환', async () => {
-      const newUserPayload: SignupTokenPayload = {
-        googleProfile: {
-          oauth_id: mockGoogleProfile.id,
-          email: mockGoogleProfile.email,
-          name: mockGoogleProfile.name,
-          picture: mockGoogleProfile.picture,
-        },
+      const newUserPayload: GoogleProfileData = {
+        oauth_id: mockGoogleProfile.id,
+        email: mockGoogleProfile.email,
+        name: mockGoogleProfile.name,
+        picture: mockGoogleProfile.picture,
       };
       (env as any).SIGNUP_MODE = 'pending';
       mockUserRepository.findByOauthId.mockResolvedValue(null);
 
       const mockSignupToken = 'signupToken_string';
-      mockTokenService.generateSignupToken.mockReturnValue(mockSignupToken);
+      mockTokenService.generateSignupToken.mockResolvedValue(mockSignupToken);
 
       const result = await authService.handleGoogleCallback(mockCode);
 
@@ -166,7 +169,7 @@ describe('AuthService 테스트', () => {
 
     // [failCases] ------------------------------
     it('[실패] Google API 호출 실패 (유효하지 않은 code)', async () => {
-      (axios.post as jest.Mock).mockRejectedValue({
+      (axios.post as jest.MockedFunction<typeof axios.post>).mockRejectedValue({
         response: {
           status: 400,
           data: { error: 'invalid_grant', error_description: 'Bad Request' },
@@ -202,29 +205,27 @@ describe('AuthService 테스트', () => {
       name: '테스터',
       picture: 'profile.jpg',
     };
-    const newUserPayload: SignupTokenPayload = {
-      googleProfile: {
-        oauth_id: mockGoogleProfile.id,
-        email: mockGoogleProfile.email,
-        name: mockGoogleProfile.name,
-        picture: mockGoogleProfile.picture,
-      },
+    const newUserPayload: GoogleProfileData = {
+      oauth_id: mockGoogleProfile.id,
+      email: mockGoogleProfile.email,
+      name: mockGoogleProfile.name,
+      picture: mockGoogleProfile.picture,
     };
     const createdNewUser: User = {
       id: 2,
       user_uuid: 'uuid-123',
-      email: newUserPayload.googleProfile.email,
+      email: newUserPayload.email,
       oauth_provider: 'google',
-      oauth_id: newUserPayload.googleProfile.oauth_id,
-      nickname: newUserPayload.googleProfile.name,
-      profile_image_url: newUserPayload.googleProfile.picture,
+      oauth_id: newUserPayload.oauth_id,
+      nickname: newUserPayload.name,
+      profile_image_url: newUserPayload.picture,
       isTermsAgreed: true,
       created_at: new Date(),
     };
     const mockSignupToken = 'valid.signup.token';
 
     beforeEach(() => {
-      mockTokenService.verifySignupToken.mockReturnValue(newUserPayload);
+      mockTokenService.verifySignupToken.mockResolvedValue(newUserPayload);
 
       mockUserRepository.createUser.mockResolvedValue(createdNewUser);
 
@@ -241,11 +242,11 @@ describe('AuthService 테스트', () => {
       const mockIsTermsAgreed = true;
       const newUserData: CreateUserInput = {
         user_uuid: mockUuid,
-        email: newUserPayload.googleProfile.email,
+        email: newUserPayload.email,
         oauth_provider: 'google',
-        oauth_id: newUserPayload.googleProfile.oauth_id,
-        nickname: newUserPayload.googleProfile.name,
-        profile_image_url: newUserPayload.googleProfile.picture,
+        oauth_id: newUserPayload.oauth_id,
+        nickname: newUserPayload.name,
+        profile_image_url: newUserPayload.picture,
         isTermsAgreed: mockIsTermsAgreed,
       };
 
@@ -276,33 +277,31 @@ describe('AuthService 테스트', () => {
     });
 
     it('[실패] 토큰이 만료되었거나 변조된 경우 Unauthorized', async () => {
-      mockTokenService.verifySignupToken.mockImplementation(() => {
-        throw Errors.Unauthorized('Access Token이 만료되었습니다');
-      });
+      mockTokenService.verifySignupToken.mockRejectedValue(
+        Errors.Unauthorized('회원가입 토큰이 만료되었습니다')
+      );
 
       await expect(authService.handleGoogleSignup('expiredToken', true)).rejects.toThrow(
-        'Access Token이 만료되었습니다'
+        '회원가입 토큰이 만료되었습니다'
       );
       expect(mockUserRepository.createUser).not.toHaveBeenCalled();
     });
 
     it('[실패] 토큰이 변조된 경우 Unauthorized 에러를 던져야 한다', async () => {
-      mockTokenService.verifySignupToken.mockImplementation(() => {
-        throw Errors.Unauthorized('유효하지 않은 Access Token입니다');
-      });
+      mockTokenService.verifySignupToken.mockRejectedValue(
+        Errors.Unauthorized('유효하지 않은 회원가입 토큰입니다')
+      );
 
       await expect(authService.handleGoogleSignup('invalidToken', true)).rejects.toThrow(
-        '유효하지 않은 Access Token입니다'
+        '유효하지 않은 회원가입 토큰입니다'
       );
     });
 
-    it('[실패] 닉네임 누락 등 필수 데이터 검증 실패', async () => {
-      mockTokenService.verifySignupToken.mockImplementation(() => {
-        throw Errors.Unauthorized('유효하지 않은 토큰 페이로드입니다');
-      });
+    it('[실패] 만료되었거나 존재하지 않는 토큰이면 BadRequest', async () => {
+      mockTokenService.verifySignupToken.mockResolvedValue(null);
 
       await expect(authService.handleGoogleSignup('invalidPayloadToken', true)).rejects.toThrow(
-        '유효하지 않은 토큰 페이로드입니다'
+        '유효하지 않은 회원가입 토큰입니다'
       );
     });
   });

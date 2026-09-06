@@ -1,21 +1,40 @@
 import { GRACE_PERIOD, REFRESH_TOKEN_EXPIRES_IN } from '../constants/token.constants';
 import { logger } from '../middlewares/logger';
+import { IRedisBlacklistRepository } from '../repositories/redisBlacklist.repository';
+import { IRedisSignupRepository } from '../repositories/redisSignup.repository';
+import { GoogleProfileData } from '../types/auth.types';
 import {
-  IRedisBlacklistRepository,
-  ITokenService,
   MainTokenPayload,
   ParticipantTokenPayload,
   RefreshTokenPayload,
-  SignupTokenPayload,
   TokenPair,
-  UserTokenPayload,
 } from '../types/token.types';
 import { Errors } from '../utils/errors';
 import * as jwt from '../utils/jwt';
 import { toSeconds } from '../utils/timeConverter';
 
+export interface ITokenService {
+  verifySignupToken(token: string): Promise<GoogleProfileData | null>;
+  generateMainToken(payload: MainTokenPayload, expiresIn?: string): string;
+  verifyMainToken(token: string): MainTokenPayload;
+
+  generateParticipantToken(payload: ParticipantTokenPayload, expiresIn?: string): string;
+  verifyParticipantToken(token: string): ParticipantTokenPayload;
+
+  generateSignupToken(signupTokenPayload: GoogleProfileData): Promise<string>;
+  generateRefreshToken(sub: string, expiresIn?: string): Promise<string>;
+  verifyRefreshToken(token: string): Promise<RefreshTokenPayload>;
+  generateTokenPair(userUuid: string): Promise<TokenPair>;
+  refreshAccessToken(refreshToken: string): Promise<TokenPair>;
+  revokeRefreshToken(token: string): Promise<boolean>;
+  revokeAllRefreshTokens(userUuid: string): Promise<boolean>;
+}
+
 export class TokenService implements ITokenService {
-  constructor(private redisBlacklist: IRedisBlacklistRepository) {}
+  constructor(
+    private redisBlacklist: IRedisBlacklistRepository,
+    private redisSignup: IRedisSignupRepository
+  ) {}
 
   private async useAuthStore<T>(operation: string, task: () => Promise<T>): Promise<T> {
     try {
@@ -32,12 +51,12 @@ export class TokenService implements ITokenService {
 
   // 회원가입 토큰----------------------------------------
 
-  public verifySignupToken(token: string) {
-    return jwt.verifySignupToken(token);
+  public async verifySignupToken(token: string): Promise<GoogleProfileData | null> {
+    return this.redisSignup.verifySignupToken(token);
   }
 
-  public generateSignupToken(payload: SignupTokenPayload, expiresIn?: string): string {
-    return jwt.generateSignupToken(payload, expiresIn);
+  public async generateSignupToken(signupTokenPayload: GoogleProfileData): Promise<string> {
+    return this.redisSignup.issueSignupToken(signupTokenPayload);
   }
 
   // 메인토큰 --------------------------------
@@ -48,11 +67,6 @@ export class TokenService implements ITokenService {
 
   public verifyMainToken(token: string): MainTokenPayload {
     return jwt.verifyMainToken(token);
-  }
-
-  // TODO: 안씀 지울 예정
-  public verifyUserToken(token: string): UserTokenPayload {
-    return jwt.verifyUserToken(token);
   }
 
   // 참가자 토큰 ----------------------------------------------------
@@ -128,13 +142,26 @@ export class TokenService implements ITokenService {
     const payload = await this.verifyRefreshToken(refreshToken);
     const newTokenPair = await this.generateTokenPair(payload.sub);
 
-    await this.revokeRefreshToken(refreshToken);
+    await this.revokeSingleRefreshToken(refreshToken);
 
     return newTokenPair;
   }
 
   public async revokeRefreshToken(token: string): Promise<boolean> {
-    const { sub, tokenId, role, exp, iat } = jwt.verifyRefreshTokenForRevoke(token);
+    const { sub } = jwt.verifyRefreshTokenForRevoke(token);
+    const revoked = await this.revokeSingleRefreshToken(token);
+
+    if (!revoked) {
+      return false;
+    }
+
+    await this.revokeAllRefreshTokens(sub);
+
+    return true;
+  }
+
+  private async revokeSingleRefreshToken(token: string): Promise<boolean> {
+    const { tokenId, exp } = jwt.verifyRefreshTokenForRevoke(token);
     // 초단위 통일
     const now = Math.floor(Date.now() / 1000);
     if (!exp) return false;
@@ -148,10 +175,6 @@ export class TokenService implements ITokenService {
     // 이미 블랙리스트에 등록된 토큰은 verifyRefreshToken에서 처리
     await this.useAuthStore('토큰 블랙리스트 기록', () =>
       this.redisBlacklist.addToBlacklist(tokenId, expiresIn, now.toString())
-    );
-
-    await this.useAuthStore('사용자 토큰 무효화 기록', () =>
-      this.redisBlacklist.recordUserAndRevokedAt(sub, expiresIn, now.toString())
     );
 
     return true;

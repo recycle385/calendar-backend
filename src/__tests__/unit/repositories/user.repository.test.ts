@@ -6,27 +6,27 @@ describe('userRepository 테스트', () => {
 
   beforeEach(() => {
     mockPool = {
-      query: jest.fn(),
+      execute: jest.fn(),
     };
     userRepository = new UserRepository(mockPool);
   });
 
-  it('', async () => {
-    mockPool.query.mockResolvedValue({ rows: [] });
+  it('findByOauthId는 provider와 oauthId로 사용자를 조회해야 한다', async () => {
+    mockPool.execute.mockResolvedValue([[]]);
 
     const provider = 'google';
     const oauthId = 'some-id';
 
-    await userRepository.findByOauthId(provider, oauthId);
+    const result = await userRepository.findByOauthId(provider, oauthId);
 
-    const expectedSql =
-      'SELECT user_uuid, email, oauth_provider, nickname, profile_image_url  FROM users WHERE oauth_provider = ? AND oauth_id = ?';
+    const expectedSql = 'SELECT * FROM users WHERE oauth_provider = ? AND oauth_id = ?';
     const expectedParams = [provider, oauthId];
 
-    expect(mockPool.query).toHaveBeenCalledWith(expectedSql, expectedParams);
+    expect(result).toBeNull();
+    expect(mockPool.execute).toHaveBeenCalledWith(expectedSql, expectedParams);
   });
 
-  it.only('DB에 유저가 존재하면 User 객체를 반환해야 한다', async () => {
+  it('DB에 유저가 존재하면 User 객체를 반환해야 한다', async () => {
     // 1. DB에서 리턴될 가짜 데이터 (Mock Data) 정의
     const mockDbRow = {
       id: 1,
@@ -42,7 +42,7 @@ describe('userRepository 테스트', () => {
 
     // 2. mockPool이 execute 되었을 때 위 데이터를 반환하도록 설정
     // mysql2 라이브러리는 [rows, fields] 형태의 배열을 반환하므로 [[row]] 형태로 리턴합니다.
-    mockPool.execute = jest.fn().mockResolvedValue([[mockDbRow]]);
+    mockPool.execute.mockResolvedValue([[mockDbRow]]);
 
     // 3. 테스트할 메서드 실행
     const result = await userRepository.findByOauthId('google', 'google-oauth-id');

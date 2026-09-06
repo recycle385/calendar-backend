@@ -1,10 +1,7 @@
 export { isRefreshToken } from './helpers';
 
 // Main Token (Access Token)
-export { generateMainToken, verifyMainToken, verifyUserToken } from './mainToken';
-
-// Signup Token
-export { generateSignupToken, verifySignupToken } from './signupToken';
+export { generateMainToken, verifyMainToken } from './mainToken';
 
 // Guest Token
 export { generateParticipantToken, verifyParticipantToken } from './participantToken';

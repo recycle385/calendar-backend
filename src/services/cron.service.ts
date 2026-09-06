@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 
 import { logger } from '../middlewares/logger';
-import { dateKindMap, SafeDateInfo } from '../models/DateInfo';
+import { dateKindMap, SafeDateInfo, VALID_DATE_KINDS } from '../models/DateInfo';
 import { ICalendarRepository } from '../repositories/calendar.repository';
 import { IDateInfoRepository } from '../repositories/dateInfo.repository';
 import { getIO } from '../sockets';
@@ -110,6 +110,32 @@ export class CronService {
     }
   }
 
+  public async runHolidayUpdate() {
+    const currentYear = new Date().getFullYear().toString();
+    const syncedDateKinds = await this.dateInfoRepository.findSyncedPublicApiDateKindsByYear(
+      currentYear
+    );
+    const missingDateKinds = VALID_DATE_KINDS.filter(
+      (dateKind) => !syncedDateKinds.includes(dateKind)
+    );
+
+    if (missingDateKinds.length === 0) {
+      logger.info(
+        `[Cron] 서버 시작 시 ${currentYear}년 모든 date-kind 동기화가 완료되어 업데이트 생략`
+      );
+      return;
+    }
+
+    logger.info(
+      `[Cron] 서버 시작 시 ${currentYear}년 미동기화 date-kind(${missingDateKinds.join(',')}) 업데이트 시작`
+    );
+
+    await this.updateDateInfo(true);
+    await this.deleteExpiredDateInfo();
+
+    logger.info('[Cron] 서버 시작 시 공휴일 정보 업데이트 종료');
+  }
+
   private async updateDateInfo(onlyMissing: boolean) {
     const currentYear = new Date().getFullYear();
 
@@ -155,8 +181,8 @@ export class CronService {
       const deletedCount = await this.dateInfoRepository.deleteByYearBefore(
         expirationYear.toString()
       );
-
       await this.dateInfoRepository.deleteSyncStatusByYearBefore(expirationYear.toString());
+
       logger.info(`[Cron] ${expirationYear}년 date-info 삭제 완료: ${deletedCount}개`);
 
       const remainingData = await this.dateInfoRepository.findByYearBefore(

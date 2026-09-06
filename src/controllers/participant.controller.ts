@@ -4,9 +4,9 @@ import { logger } from '../middlewares/logger';
 import { ParticipantServiceInput } from '../models';
 import { ICalendarService } from '../services/calendar.service';
 import { IParticipantService } from '../services/participant.service';
+import { ITokenService } from '../services/token.service';
 import { IUserService } from '../services/user.service';
 import { getIO } from '../sockets';
-import { ITokenService } from '../types/token.types';
 import { Errors } from '../utils/errors';
 
 export class ParticipantController {
@@ -58,7 +58,7 @@ export class ParticipantController {
     const participantToken = this.tokenService.generateParticipantToken({
       sub: result.participant.participant_uuid,
       nickname: result.participant.nickname,
-      calendarId: slug,
+      calendarSlug: slug,
       role: result.participant.role,
 
       userUuid: userUuid,
@@ -100,7 +100,7 @@ export class ParticipantController {
       sub: result.participantUuid,
       nickname: result.participant.nickname,
       role: result.participant.role,
-      calendarId: slug,
+      calendarSlug: slug,
 
       userUuid: userUuid,
     });
@@ -199,6 +199,12 @@ export class ParticipantController {
     }
 
     const calendar = await this.calendarService.getCalendarBySlug(slug);
+
+    const actingParticipant =
+      await this.participantService.getParticipantByUuid(userParticipantUuid);
+    if (actingParticipant.calendar_id !== calendar.id || actingParticipant.role !== 'host') {
+      throw Errors.Forbidden('이 캘린더의 방장만 참가자를 강퇴할 수 있습니다');
+    }
 
     const targetId = await this.participantService.getParticipantIdByUuid(targetUuid);
 

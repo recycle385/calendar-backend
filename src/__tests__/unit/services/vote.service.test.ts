@@ -3,7 +3,6 @@ import { DateVoteStatus } from '../../../models/Vote';
 import { IDateOptionRepository } from '../../../repositories/dateOption.repository';
 import { IVoteRepository } from '../../../repositories/vote.repository';
 import { VoteService } from '../../../services/vote.service';
-import { Errors } from '../../../utils/errors';
 
 // TransactionManager Mocking
 jest.mock('../../../infrastructure/transaction.manager', () => ({
@@ -32,6 +31,7 @@ const mockDateOptionRepository: jest.Mocked<IDateOptionRepository> = {
   findByCalendarId: jest.fn(),
   findDateOptionsByCalendarAndDate: jest.fn(),
   findByCalendarAndDate: jest.fn(),
+  deleteOutsideRange: jest.fn(),
   delete: jest.fn(),
   deleteByCalendarId: jest.fn(),
 };
@@ -55,9 +55,10 @@ describe('VoteService Unit Test', () => {
 
     it('[성공] 유효한 날짜들에 대해 투표(Available)가 정상적으로 저장되어야 한다', async () => {
       // Mock: 날짜 옵션 조회 성공 (활성화된 날짜)
-      mockDateOptionRepository.findByCalendarAndDate
-        .mockResolvedValueOnce({ id: 10, is_enabled: true } as DateOption) // 2025-01-01
-        .mockResolvedValueOnce({ id: 11, is_enabled: true } as DateOption); // 2025-01-02
+      mockDateOptionRepository.findDateOptionsByCalendarAndDate.mockResolvedValue([
+        { id: 10, is_enabled: true } as DateOption,
+        { id: 11, is_enabled: true } as DateOption,
+      ]);
 
       // Mock: 투표 일괄 저장 성공 (영향받은 행 수 반환)
       mockVoteRepository.upsertVotes.mockResolvedValue(2);
@@ -71,12 +72,14 @@ describe('VoteService Unit Test', () => {
       );
 
       // 검증
-      expect(mockDateOptionRepository.findByCalendarAndDate).toHaveBeenCalledTimes(2);
+      expect(mockDateOptionRepository.findDateOptionsByCalendarAndDate).toHaveBeenCalledWith(
+        calendarId,
+        selectedDates
+      );
       expect(mockVoteRepository.upsertVotes).toHaveBeenCalledWith(
         participantId,
         [10, 11], // 조회된 dateOptionId 목록
-        voteType,
-        expect.anything() // connection
+        voteType
       );
       expect(result).toBe(2);
     });
@@ -85,10 +88,9 @@ describe('VoteService Unit Test', () => {
       // *참고: 실제 삭제 후 생성 로직은 Repository 내부에 구현되어 있으므로,
       // Service 테스트에서는 Service가 Repository의 올바른 메서드(upsertVotes)를 호출하는지 검증합니다.
 
-      mockDateOptionRepository.findByCalendarAndDate.mockResolvedValue({
-        id: 10,
-        is_enabled: true,
-      } as DateOption);
+      mockDateOptionRepository.findDateOptionsByCalendarAndDate.mockResolvedValue([
+        { id: 10, is_enabled: true } as DateOption,
+      ]);
       mockVoteRepository.upsertVotes.mockResolvedValue(1);
 
       await voteService.submitVotes(participantId, calendarId, ['2025-01-01'], 'maybe');
@@ -99,19 +101,18 @@ describe('VoteService Unit Test', () => {
 
     it('[실패] 캘린더 범위 밖의 날짜(존재하지 않는 날짜 옵션)에 투표 시도 시 BadRequest', async () => {
       // Mock: 날짜 옵션 조회 실패 (null 반환)
-      mockDateOptionRepository.findByCalendarAndDate.mockResolvedValue(null);
+      mockDateOptionRepository.findDateOptionsByCalendarAndDate.mockResolvedValue([]);
 
       await expect(
         voteService.submitVotes(participantId, calendarId, ['2099-12-31'])
-      ).rejects.toThrow('유효하지 않은 날짜입니다');
+      ).rejects.toThrow('유효하지 않은 날짜가 포함되어 있습니다');
     });
 
     it('[실패] 비활성화된 날짜 옵션에 투표 시도 시 BadRequest', async () => {
       // Mock: 날짜 옵션 조회 성공했으나 비활성화됨
-      mockDateOptionRepository.findByCalendarAndDate.mockResolvedValue({
-        id: 99,
-        is_enabled: false,
-      } as DateOption);
+      mockDateOptionRepository.findDateOptionsByCalendarAndDate.mockResolvedValue([
+        { id: 99, is_enabled: false } as DateOption,
+      ]);
 
       await expect(
         voteService.submitVotes(participantId, calendarId, ['2025-01-01'])

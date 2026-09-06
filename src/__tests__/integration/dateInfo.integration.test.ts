@@ -2,9 +2,12 @@ import request from 'supertest';
 
 import { app } from '../../app';
 import pool, { closeDatabaseConnection } from '../../config/database';
+import { env } from '../../config/env';
 
 describe('DateInfo Integration Test', () => {
   const TARGET_YEAR = '2099';
+  const OPERATOR_TOKEN = 'date-info-integration-operator-token';
+  let isDbReachable = false;
   const payload = {
     dateInfos: [
       {
@@ -29,37 +32,37 @@ describe('DateInfo Integration Test', () => {
   };
 
   beforeAll(async () => {
-    // Ensure clean state if DB is reachable
+    env.HOST_ACCESS_TOKEN = OPERATOR_TOKEN;
     try {
+      await pool.query('SELECT 1');
+      isDbReachable = true;
       await pool.query('DELETE FROM date_info WHERE year = ?', [TARGET_YEAR]);
-    } catch (err) {
-      console.warn('DB not reachable in beforeAll, integration tests will be skipped.');
+    } catch {
+      isDbReachable = false;
     }
   });
 
   afterAll(async () => {
-    try {
+    if (isDbReachable) {
       await pool.query('DELETE FROM date_info WHERE year = ?', [TARGET_YEAR]);
-    } catch (err) {
-      console.warn('DB not reachable in afterAll, skipping cleanup.');
     }
+
     try {
       await closeDatabaseConnection();
-    } catch (err) {
+    } catch {
       console.warn('Error closing DB connection (likely unreachable).');
     }
   });
 
   it('POST /api/v1/date-infos/batch inserts rows and returns 201', async () => {
-    // check DB reachable
-    try {
-      await pool.query('SELECT 1');
-    } catch (err) {
-      console.warn('DB not reachable, skipping integration test for batch insert');
-      return;
+    if (!isDbReachable) {
+      throw new Error('DateInfo integration insert test requires reachable test DB.');
     }
 
-    const res = await request(app).post('/api/v1/date-infos/batch').send(payload);
+    const res = await request(app)
+      .post('/api/v1/date-infos/batch')
+      .set('Authorization', `Bearer ${OPERATOR_TOKEN}`)
+      .send(payload);
 
     expect(res.status).toBe(201);
     expect(res.text).toContain('2개의 정보가 추가됐습니다.');
@@ -75,10 +78,15 @@ describe('DateInfo Integration Test', () => {
   });
 
   it('POST /api/v1/date-infos/batch with wrong key returns 400', async () => {
-    // If DB not reachable, validator still runs so we can run this check without DB
     const res = await request(app)
       .post('/api/v1/date-infos/batch')
+      .set('Authorization', `Bearer ${OPERATOR_TOKEN}`)
       .send({ dateInfoList: payload.dateInfos });
     expect(res.status).toBe(400);
+  });
+
+  it('POST /api/v1/date-infos/batch without operator token returns 401', async () => {
+    const res = await request(app).post('/api/v1/date-infos/batch').send(payload);
+    expect(res.status).toBe(401);
   });
 });
