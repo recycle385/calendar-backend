@@ -23,7 +23,8 @@ export class RedisBlacklistRepository implements IRedisBlacklistRepository {
   async addToBlacklist(tokenId: string, expiresIn: number, revokedAt: string): Promise<void> {
     const key = `blacklist:${tokenId}`;
 
-    await this.redis.setEx(key, expiresIn, revokedAt);
+    // 동시 갱신과 유예 기간 내 재요청도 최초 폐기 시각을 바꾸지 않는다.
+    await this.redis.set(key, revokedAt, { EX: expiresIn, NX: true });
   }
 
   async recordUserAndRevokedAt(

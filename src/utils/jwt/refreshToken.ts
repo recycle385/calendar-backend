@@ -16,6 +16,11 @@ function toRefreshTokenPayload(decoded: unknown): RefreshTokenPayload {
   const subject = extractProperty.string(decoded, 'sub', '사용자 UUID');
   const tokenId = extractProperty.string(decoded, 'tokenId', '토큰 ID');
   const exp = extractProperty.number(decoded, 'exp', '만료 시간');
+  const iat = extractProperty.number(decoded, 'iat', '발급 시간');
+
+  if (!Number.isSafeInteger(iat) || iat <= 0) {
+    throw Errors.Unauthorized('유효하지 않은 Refresh Token 발급 시간입니다');
+  }
 
   if (isRefreshToken(decoded) === false) {
     throw Errors.Unauthorized('유효하지 않은 Refresh Token입니다');
@@ -26,6 +31,7 @@ function toRefreshTokenPayload(decoded: unknown): RefreshTokenPayload {
     tokenId,
     role: 'host',
     exp: exp,
+    iat,
   };
 }
 

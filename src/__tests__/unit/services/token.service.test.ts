@@ -301,8 +301,8 @@ describe('TokenService 테스트', () => {
         '비정상적인 접근 감지: 블랙리스트 유저 완전차단'
       );
 
-      // 이 경우에도 보안상 revokeAllRefreshTokens이 내부적으로 한 번 더 호출됩니다
-      expect(mockRedisBlacklistRepository.recordUserAndRevokedAt).toHaveBeenCalled();
+      // 이미 폐기된 토큰의 재요청이 새 로그인 세션까지 폐기하면 안 된다.
+      expect(mockRedisBlacklistRepository.recordUserAndRevokedAt).not.toHaveBeenCalled();
     });
   });
 });

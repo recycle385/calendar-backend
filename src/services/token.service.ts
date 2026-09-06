@@ -117,7 +117,6 @@ export class TokenService implements ITokenService {
       );
 
       if (userRevokedAt && userRevokedAt >= payload.iat!) {
-        await this.revokeAllRefreshTokens(payload.sub);
         throw Errors.Unauthorized('비정상적인 접근 감지: 블랙리스트 유저 완전차단');
       }
     }
