@@ -36,7 +36,7 @@ export interface CreateCalendarInput {
 // UPDATE용
 export interface UpdateCalendarInput {
   title?: string;
-  description?: string;
+  description?: string | null;
   start_date?: Date | string;
   end_date?: Date | string;
   is_closed?: boolean;

@@ -12,6 +12,7 @@ export interface ICalendarRepository {
   create(input: CreateCalendarInput, connection?: PoolConnection): Promise<Calendar>;
   findById(id: number, connection?: PoolConnection): Promise<Calendar | null>;
   findBySlug(slug: string, connection?: PoolConnection): Promise<Calendar | null>;
+  findBySlugForUpdate(slug: string, connection: PoolConnection): Promise<Calendar | null>;
   getIdUsingSlug(slug: string, connection?: PoolConnection): Promise<number>;
   update(id: number, input: UpdateCalendarInput, connection?: PoolConnection): Promise<boolean>;
   delete(id: number, connection?: PoolConnection): Promise<boolean>;
@@ -94,6 +95,14 @@ export class CalendarRepository implements ICalendarRepository {
     }
 
     return this.mapToCalendar(rows[0]);
+  }
+
+  async findBySlugForUpdate(slug: string, connection: PoolConnection): Promise<Calendar | null> {
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      'SELECT * FROM calendars WHERE slug = ? FOR UPDATE',
+      [slug]
+    );
+    return rows.length === 0 ? null : this.mapToCalendar(rows[0]);
   }
 
   async getIdUsingSlug(slug: string, connection?: PoolConnection): Promise<number> {

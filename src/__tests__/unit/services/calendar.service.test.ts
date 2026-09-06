@@ -21,6 +21,7 @@ const mockCalendarRepository: jest.Mocked<ICalendarRepository> = {
   create: jest.fn(),
   findById: jest.fn(),
   findBySlug: jest.fn(),
+  findBySlugForUpdate: jest.fn(),
   getIdUsingSlug: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
@@ -38,6 +39,7 @@ const mockParticipantRepository: jest.Mocked<IParticipantRepository> = {
   findById: jest.fn(),
   findByUuid: jest.fn(),
   existsByUuid: jest.fn(),
+  existsByCalendarAndUser: jest.fn(),
   getIdUsingUuid: jest.fn(),
   getUuidUsingId: jest.fn(),
   getParticipantUuidByUserIdAndCalendarId: jest.fn(),
@@ -67,6 +69,9 @@ describe('CalendarService Unit Test', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCalendarRepository.findBySlugForUpdate.mockImplementation((slug) =>
+      mockCalendarRepository.findBySlug(slug)
+    );
     calendarService = new CalendarService(
       mockCalendarRepository,
       mockParticipantRepository,
@@ -249,7 +254,11 @@ describe('CalendarService Unit Test', () => {
       const updateInput = { title: 'New Title' };
       const result = await calendarService.updateCalendar(slug, ownerId, updateInput);
 
-      expect(mockCalendarRepository.update).toHaveBeenCalledWith(existingCalendar.id, updateInput);
+      expect(mockCalendarRepository.update).toHaveBeenCalledWith(
+        existingCalendar.id,
+        updateInput,
+        expect.anything()
+      );
       expect(result.title).toBe('New Title');
     });
 

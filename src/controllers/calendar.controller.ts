@@ -108,7 +108,7 @@ export class CalendarController {
 
     const { title, description, start_date, end_date } = req.body;
 
-    if (!title && !description && !start_date && !end_date) {
+    if ([title, description, start_date, end_date].every((value) => value === undefined)) {
       res.status(200).json({
         message: '변경사항이 없습니다',
       });

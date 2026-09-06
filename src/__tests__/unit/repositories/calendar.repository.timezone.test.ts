@@ -30,6 +30,16 @@ describe('CalendarRepository UTC 기준 조회', () => {
     ]);
   });
 
+  it('수정용 조회는 지정한 트랜잭션 연결에서 행 잠금을 사용한다', async () => {
+    const connection = { execute: jest.fn(async (..._args: unknown[]) => [[]]) };
+    await repository.findBySlugForUpdate('slug', connection as any);
+    expect(connection.execute).toHaveBeenCalledWith(
+      'SELECT * FROM calendars WHERE slug = ? FOR UPDATE',
+      ['slug']
+    );
+    expect(mockPool.execute).not.toHaveBeenCalled();
+  });
+
   it('DATE 컬럼은 Date 객체가 아니라 YYYY-MM-DD 문자열로 매핑해야 한다', async () => {
     mockPool.execute.mockImplementationOnce(async () => [
       [

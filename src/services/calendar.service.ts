@@ -217,73 +217,70 @@ export class CalendarService implements ICalendarService {
     ownerId: number,
     input: UpdateCalendarInput
   ): Promise<Calendar> {
-    const calendar = await this.getCalendarBySlug(slug);
-
-    // 권한 검증
-    if (calendar.owner_id !== ownerId) {
-      throw Errors.Forbidden('캘린더를 수정할 권한이 없습니다');
-    }
-
-    // 마감된 캘린더는 수정 불가
-    if (calendar.is_closed) {
-      throw Errors.BadRequest('마감된 캘린더는 수정할 수 없습니다');
-    }
-
-    const hasStartDate = input.start_date !== undefined;
-    const hasEndDate = input.end_date !== undefined;
-    const updateInput: UpdateCalendarInput = { ...input };
-    let effectiveStartDate = calendar.start_date.toString();
-    let effectiveEndDate = calendar.end_date.toString();
-
-    // 날짜 범위 검증
-    if (hasStartDate || hasEndDate) {
-      const startDate = input.start_date || calendar.start_date;
-      const endDate = input.end_date || calendar.end_date;
-      const dateRange = this.validateDateRange(startDate.toString(), endDate.toString());
-      effectiveStartDate = dateRange.startDate;
-      effectiveEndDate = dateRange.endDate;
-
-      if (hasStartDate) {
-        updateInput.start_date = dateRange.startDate;
+    return TransactionManager.run(async (con) => {
+      const calendar = await this.calendarRepository.findBySlugForUpdate(slug, con);
+      if (!calendar) {
+        throw Errors.NotFound('캘린더를 찾을 수 없습니다');
       }
 
-      if (hasEndDate) {
-        updateInput.end_date = dateRange.endDate;
-        updateInput.expired_at = addDateOnlyDays(dateRange.endDate, CALENDAR_GRACE_PERIOD);
+      // 권한 검증
+      if (calendar.owner_id !== ownerId) {
+        throw Errors.Forbidden('캘린더를 수정할 권한이 없습니다');
       }
-    }
 
-    const updated =
-      hasStartDate || hasEndDate
-        ? await TransactionManager.run(async (con) => {
-            const isUpdated = await this.calendarRepository.update(calendar.id, updateInput, con);
+      // 마감된 캘린더는 수정 불가
+      if (calendar.is_closed) {
+        throw Errors.BadRequest('마감된 캘린더는 수정할 수 없습니다');
+      }
 
-            if (!isUpdated) {
-              return false;
-            }
+      const hasStartDate = input.start_date !== undefined;
+      const hasEndDate = input.end_date !== undefined;
+      const updateInput: UpdateCalendarInput = { ...input };
+      let effectiveStartDate = calendar.start_date.toString();
+      let effectiveEndDate = calendar.end_date.toString();
 
-            await this.dateOptionRepository.deleteOutsideRange(
-              calendar.id,
-              effectiveStartDate,
-              effectiveEndDate,
-              con
-            );
+      // 날짜 범위 검증
+      if (hasStartDate || hasEndDate) {
+        const startDate = input.start_date || calendar.start_date;
+        const endDate = input.end_date || calendar.end_date;
+        const dateRange = this.validateDateRange(startDate.toString(), endDate.toString());
+        effectiveStartDate = dateRange.startDate;
+        effectiveEndDate = dateRange.endDate;
 
-            await this.dateOptionRepository.createBatch(
-              calendar.id,
-              eachDateOnlyInRange(effectiveStartDate, effectiveEndDate),
-              con
-            );
+        if (hasStartDate) {
+          updateInput.start_date = dateRange.startDate;
+        }
 
-            return true;
-          })
-        : await this.calendarRepository.update(calendar.id, updateInput);
+        if (hasEndDate) {
+          updateInput.end_date = dateRange.endDate;
+          updateInput.expired_at = addDateOnlyDays(dateRange.endDate, CALENDAR_GRACE_PERIOD);
+        }
+      }
 
-    if (!updated) {
-      throw Errors.Internal('캘린더 수정에 실패했습니다');
-    }
+      const updated = await this.calendarRepository.update(calendar.id, updateInput, con);
 
-    return await this.getCalendarById(calendar.id);
+      if (!updated) {
+        throw Errors.Internal('캘린더 수정에 실패했습니다');
+      }
+
+      if (hasStartDate || hasEndDate) {
+        await this.dateOptionRepository.deleteOutsideRange(
+          calendar.id,
+          effectiveStartDate,
+          effectiveEndDate,
+          con
+        );
+        await this.dateOptionRepository.createBatch(
+          calendar.id,
+          eachDateOnlyInRange(effectiveStartDate, effectiveEndDate),
+          con
+        );
+      }
+
+      const result = await this.calendarRepository.findById(calendar.id, con);
+      if (!result) throw Errors.NotFound('캘린더를 찾을 수 없습니다');
+      return result;
+    });
   }
 
   /**
