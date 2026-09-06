@@ -18,6 +18,7 @@ const mockParticipantRepository: jest.Mocked<IParticipantRepository> = {
   findById: jest.fn(),
   findByUuid: jest.fn(),
   existsByUuid: jest.fn(),
+  existsByCalendarAndUser: jest.fn(),
   getIdUsingUuid: jest.fn(),
   getUuidUsingId: jest.fn(),
   getParticipantUuidByUserIdAndCalendarId: jest.fn(),
@@ -35,6 +36,7 @@ describe('ParticipantService Unit Test', () => {
   beforeEach(() => {
     // 모든 모의 객체의 호출 기록과 반환값 설정을 초기화합니다.
     jest.resetAllMocks();
+    mockParticipantRepository.existsByCalendarAndUser.mockResolvedValue(false);
     participantService = new ParticipantService(mockParticipantRepository);
   });
 
@@ -49,6 +51,20 @@ describe('ParticipantService Unit Test', () => {
 
     beforeEach(() => {
       (randomUUID as jest.Mock).mockReturnValue(mockUuid);
+    });
+
+    it('이미 참여한 회원은 다른 닉네임으로도 중복 등록할 수 없다', async () => {
+      mockParticipantRepository.existsByCalendarAndUser.mockResolvedValue(true);
+
+      await expect(
+        participantService.registerParticipant({
+          calendarId,
+          userId: 42,
+          nickname: '다른 닉네임',
+        })
+      ).rejects.toThrow('이미 이 캘린더에 참여한 회원입니다');
+
+      expect(mockParticipantRepository.create).not.toHaveBeenCalled();
     });
 
     it('[성공] Guest 등록 시 닉네임과 해싱된 비밀번호로 생성되어야 한다', async () => {
